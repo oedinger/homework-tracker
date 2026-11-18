@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>שיעורי בית — דניאל ונאיה</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --daniel:#2563eb; --daniel-soft:#dbeafe;
+    --naya:#db2777; --naya-soft:#fce7f3;
+    --green:#16a34a; --green-soft:#dcfce7;
+    --amber:#b45309; --amber-soft:#fef3c7;
+    --red:#dc2626; --red-soft:#fee2e2;
+    --line:#e5e0d8; --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:18px 14px 48px}
+  header{margin:4px 4px 12px}
+  h1{font-size:26px; margin:0 0 4px}
+  .sub{color:var(--muted); font-size:14px}
+  .updated{font-size:14px; font-weight:700; margin-top:6px}
+  .sources{font-size:13px; color:var(--muted); margin-top:4px}
+
+  /* ---- week navigator ---- */
+  .weeknav{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 10px; margin:12px 0 10px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .weeknav-row{display:flex; align-items:center; gap:6px}
+  .navbtn{
+    flex:none; width:38px; height:38px; border-radius:50%;
+    border:1.5px solid var(--line); background:#fff; font-size:18px; cursor:pointer;
+    color:var(--ink); line-height:1;
+  }
+  .navbtn:disabled{opacity:.3; cursor:default}
+  .weeklabel{flex:1; text-align:center; min-width:0}
+  .weeklabel .wname{font-size:18px; font-weight:800}
+  .weeklabel .wtag{
+    display:inline-block; font-size:11px; font-weight:700; color:var(--green);
+    background:var(--green-soft); border-radius:999px; padding:2px 8px; margin-inline-start:6px;
+    vertical-align:2px;
+  }
+  .weeklabel .wtag.old{color:var(--muted); background:#f3f4f6}
+  .weekchips{
+    display:flex; gap:6px; overflow-x:auto; padding:10px 2px 2px;
+    scrollbar-width:none;
+  }
+  .weekchips::-webkit-scrollbar{display:none}
+  .wchip{
+    flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .wchip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .weekstats{
+    display:flex; flex-wrap:wrap; gap:6px 14px; margin:2px 4px 4px;
+    font-size:13px; color:var(--muted);
+  }
+  .weekstats b{color:var(--ink)}
+  .weekstats .st-new{color:#15803d; font-weight:700}
+  .weekstats .st-carried{color:var(--amber); font-weight:700}
+
+  .filters{display:flex; flex-wrap:wrap; gap:8px; margin:12px 4px}
+  .chip{
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:999px; padding:8px 14px; font-size:14px; cursor:pointer;
+  }
+  .chip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .chip.daniel.on{border-color:var(--daniel); background:var(--daniel)}
+  .chip.naya.on{border-color:var(--naya); background:var(--naya)}
+
+  .child{margin-top:18px}
+  .child-head{display:flex; align-items:baseline; gap:10px; padding:0 4px 8px}
+  .dot{width:14px; height:14px; border-radius:50%; flex:none; transform:translateY(1px)}
+  .dot.daniel{background:var(--daniel)} .dot.naya{background:var(--naya)}
+  .child-head h2{font-size:20px; margin:0}
+  .count{color:var(--muted); font-size:13px; margin-inline-start:auto}
+  .bar{height:8px; background:#e7e2d9; border-radius:99px; overflow:hidden; margin:0 4px 10px}
+  .bar > div{height:100%; border-radius:99px; transition:width .3s}
+  .bar.daniel > div{background:var(--daniel)}
+  .bar.naya > div{background:var(--naya)}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 14px 0; margin-bottom:10px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .card.done{opacity:.62}
+  .card.done .title{text-decoration:line-through}
+  .card-top{display:flex; gap:12px; align-items:flex-start}
+  .check{
+    flex:none; width:30px; height:30px; margin-top:2px; cursor:pointer;
+    accent-color:var(--green); transform:scale(1.25);
+  }
+  .card-main{flex:1; min-width:0}
+  .title-row{display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap}
+  .title{font-size:17px; font-weight:700; line-height:1.4; flex:1; min-width:140px}
+  .duepill{
+    flex:none; font-size:14px; font-weight:800; border-radius:999px;
+    padding:5px 12px; white-space:nowrap;
+    background:#f3f4f6; color:var(--muted);
+  }
+  .duepill.today{background:var(--red-soft); color:var(--red)}
+  .duepill.tomorrow{background:var(--amber-soft); color:var(--amber)}
+  .duepill.overdue{background:var(--red-soft); color:var(--red)}
+  .duepill.future{background:var(--daniel-soft); color:var(--daniel)}
+  .duepill.given{background:#f3f4f6; color:var(--muted)}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .tag{
+    font-size:12px; font-weight:700; border-radius:999px; padding:3px 9px;
+    background:#f3f4f6; color:var(--muted);
+  }
+  .tag.carried{background:var(--amber-soft); color:var(--amber)}
+  .tag.isnew{background:var(--green-soft); color:#15803d}
+  .details-btn{
+    display:block; width:100%; margin-top:10px; padding:10px 4px;
+    border:none; border-top:1px solid var(--line); background:none;
+    color:var(--daniel); font-size:14px; font-weight:700; cursor:pointer;
+    text-align:center;
+  }
+  .details{display:none; padding:0 0 14px}
+  .details.open{display:block}
+  .details-text{font-size:15px; line-height:1.65; margin:4px 0 8px}
+  .details-meta{color:var(--muted); font-size:13px; line-height:1.6}
+  .links{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+  .links a{
+    font-size:13px; color:var(--daniel); background:var(--daniel-soft);
+    border-radius:999px; padding:5px 11px; text-decoration:none; font-weight:600;
+  }
+  .empty{
+    text-align:center; color:var(--muted); padding:28px 10px; font-size:15px;
+    background:var(--card); border:1px dashed var(--line); border-radius:var(--radius);
+  }
+  .alldone{
+    text-align:center; padding:22px 10px; font-size:18px; font-weight:700;
+    background:var(--green-soft); color:var(--green);
+    border-radius:var(--radius); margin-top:6px;
+  }
+  footer{color:var(--muted); font-size:12px; text-align:center; margin-top:26px; line-height:1.7}
+  .err{
+    display:none; background:var(--red-soft); color:var(--red); border-radius:12px;
+    padding:12px; margin:10px 4px; font-size:14px; text-align:center;
+  }
+
+  /* ---- tabs ---- */
+  .tabs{display:flex; gap:8px; margin:12px 4px 4px}
+  .tab{flex:1; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:10px 8px; font-size:15px; font-weight:700; cursor:pointer}
+  .tab.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .daychips{display:flex; gap:6px; overflow-x:auto; padding:10px 2px 2px; scrollbar-width:none; margin:8px 4px}
+  .daychips::-webkit-scrollbar{display:none}
+  .dchip{flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600}
+  .dchip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .dchip.today{border-color:var(--daniel)}
+  .sched-day{font-size:18px; font-weight:800; margin:14px 4px 4px}
+  .sched-day .today-tag{font-size:11px; font-weight:700; color:var(--green); background:var(--green-soft); border-radius:999px; padding:2px 8px; margin-inline-start:6px; vertical-align:2px}
+  .srow{display:flex; gap:10px; align-items:baseline; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:6px}
+  .srow .stime{flex:none; font-weight:700; font-variant-numeric:tabular-nums; direction:ltr; min-width:108px}
+  .srow .stitle{flex:1; font-weight:600}
+  .srow .stag{flex:none; font-size:11px; font-weight:700; border-radius:999px; padding:2px 8px}
+  .stag.school{background:var(--daniel-soft); color:#1e40af}
+  .stag.tzaharon{background:var(--green-soft); color:#166534}
+  .stag.chug{background:var(--naya-soft); color:#9d174d}
+  .stag.end{background:#f3f4f6; color:var(--muted)}
+  .srow.now{border-color:var(--green); box-shadow:0 0 0 1px var(--green)}
+  .srow .nowtag{color:var(--green); font-size:11px; font-weight:800}
+  .srow.tzbar{background:var(--green-soft); border-color:#bbf7d0; color:#166534; font-weight:700}
+  .srow.brk{background:#fafaf9; border:1px dashed var(--line)}
+  .srow.brk .stitle{color:var(--muted)}
+  .stag.brk{background:#f3f4f6; color:var(--muted)}
+  .sched-note{font-size:12px; color:var(--muted); margin:14px 4px; line-height:1.6}
+  .sharebtn{display:block; width:calc(100% - 8px); margin:10px 4px; padding:11px; border:1.5px solid var(--line); background:#fff; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; color:var(--ink)}
+  .sharebtn:active{background:#f3f4f6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📚 דניאל ונאיה</h1>
+    <div class="sub">שיעורי בית ומערכת שעות</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab on" data-tab="homework">📚 שיעורי בית</button>
+    <button class="tab" data-tab="schedule">🗓️ מערכת שעות</button>
+  </nav>
+
+  <div class="err" id="err">לא הצלחתי לטעון את המשימות — נסו לרענן את הדף.</div>
+
+  <div id="homeworkView">
+    <div class="updated" id="lastUpdated"></div>
+    <div class="sources" id="sourcePulls"></div>
+
+  <div class="weeknav" id="weeknav" style="display:none">
+    <div class="weeknav-row">
+      <button class="navbtn" id="prevWeek" aria-label="שבוע קודם">›</button>
+      <div class="weeklabel">
+        <span class="wname" id="weekName"></span><span class="wtag" id="weekTag"></span>
+      </div>
+      <button class="navbtn" id="nextWeek" aria-label="שבוע הבא">‹</button>
+    </div>
+    <div class="weekchips" id="weekChips"></div>
+  </div>
+  <div class="weekstats" id="weekStats"></div>
+
+  <div class="filters" id="statusFilters">
+    <button class="chip" data-status="all">הכל</button>
+    <button class="chip on" data-status="open">פתוחות</button>
+    <button class="chip" data-status="done">בוצעו</button>
+  </div>
+  <div class="filters" id="childFilters" style="margin-top:-6px">
+    <button class="chip on" data-child="all">שני הילדים</button>
+    <button class="chip daniel" data-child="daniel">🔵 דניאל</button>
+    <button class="chip naya" data-child="naya">🩷 נאיה</button>
+  </div>
+
+  <div id="app"></div>
+  </div>
+
+  <div id="scheduleView" style="display:none">
+    <div class="daychips" id="dayChips"></div>
+    <button class="sharebtn" id="shareSched">🔗 העתק קישור ליום הזה</button>
+    <div id="schedApp"></div>
+    <div class="sched-note">שעות השיעורים של נאיה לפי פעמוני בית הספר (כמו ג׳3) — אושרו התחלה 8:00 וסיום 12:45, שישי 11:40. מקורות: מערכת ג׳3 (ליאור, 11/9) · מערכת א׳2 (מורן, 4/11) · מערכת חוגים א2 (17/11) · יומן חוגים.</div>
+  </div>
+
+  <footer>
+    מקור המשימות: גיליון שיעורי הבית • הסימונים נשמרים ומסונכרנים בין כולם<br>
+    מערכת שעות: מערכות בית הספר והחוגים כפי שנמסרו • נבנה לשימוש המשפחה
+  </footer>
+</div>
+
+<script>
+const KIDS = {
+  daniel: { name: "דניאל", emoji: "🔵", cls: "daniel" },
+  naya:   { name: "נאיה",  emoji: "🩷", cls: "naya" }
+};
+let WEEKS = { weeks: [], current: "" };
+let DATA = { week: "", updated: "", tasks: [] };
+let viewWeek = "";
+let statusFilter = "open";
+let childFilter = "all";
+
+/* ---- weekly timetable (static reference data, updated 17/11/2026) ----
+   Sources: Daniel g3 PDF (Lior, 11/9) · Naya a2 PDF (Moran, 4/11) ·
+   A2 chugim photo (17/11) · Google "חוגים" calendar.
+   Confirmed by Oren 17/11: school starts 08:00 for both; Daniel has no
+   tzaharon; Naya ends school 12:45 (Fri 11:40) and goes straight to
+   tzaharon until 16:30, chugim during it. Naya's lesson times follow the
+   school bells (same as g3) — only start/end are confirmed. */
+const SCHEDULE = { days: [
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","מדעים"],["08:50–09:35","חינוך גופני"],["10:10–10:55","מתמטיקה"],["10:55–11:40","עברית"],["12:00–12:45","מולדת"]],
+      tzchug: [], extra: [["16:00–17:00","אנגלית"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","שפה"],["10:10–10:55","חינוך גופני"],["10:55–11:40","חשבון"],["12:00–12:45","ספרייה / גאומטריה"]],
+      tzchug: [["13:30–14:30","תכשיטנות (גלי אדלשטיין)"]], extra: [] } },
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","אנגלית"],["08:50–09:35","אנגלית"],["10:10–10:55","עברית"],["10:55–11:40","גאומטריה"],["12:00–12:45","עברית"]],
+      tzchug: [], extra: [["16:45–17:30","שחייה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","אנגלית"],["10:10–10:55","חינוך גופני"],["10:55–11:40","חשבון"],["12:00–12:45","חשבון"]],
+      tzchug: [["15:00–16:30","אומנות משולבת (שרה)"]], extra: [["17:45–18:30","התעמלות קרקע"]] } },
+  { daniel: { end: "13:30", tzaharon: null,
+      school: [["08:00–08:50","מתמטיקה"],["08:50–09:35","מתמטיקה"],["10:10–10:55","לשון"],["10:55–11:40","אמנות"],["12:00–12:45","מדעים"],["12:45–13:30","חינוך גופני"]],
+      tzchug: [], extra: [["15:00–16:00","שיעור פרטי חשבון"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","אומנות"],["08:50–09:35","ספורט בזמר"],["10:10–10:55","מוסיקה"],["10:55–11:40","זהירות בדרכים"],["12:00–12:45","מדעים"]],
+      tzchug: [["14:15–15:00","קוסמות (גאיה סלם)"]], extra: [] } },
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","עברית / כלבנות"],["08:50–09:35","עברית / כלבנות"],["10:10–10:55","מדעים"],["10:55–11:40","אנגלית"],["12:00–12:45","אנגלית מדוברת"]],
+      tzchug: [], extra: [["16:45–17:30","שחייה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","חשבון"],["08:50–09:35","שפה"],["10:10–10:55","חשבון"],["10:55–11:40","כישורי חיים"],["12:00–12:45","מדעים"]],
+      tzchug: [["13:30–14:15","וטרינריה (יובל כהן)"]], extra: [["16:30–17:30","שחייה (עם בן)"]] } },
+  { daniel: { end: "13:30", tzaharon: null,
+      school: [["08:00–08:50","מתמטיקה"],["08:50–09:35","מתמטיקה"],["10:10–10:55","מולדת"],["10:55–11:40","תנ״ך"],["12:00–12:45","מפתח הלב"],["12:45–13:30","עברית"]],
+      tzchug: [], extra: [["16:25–17:25","נינג׳ה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","שפה"],["10:10–10:55","חשבון"],["10:55–11:40","שפה / יוגה"],["12:00–12:45","שפה / יוגה"]],
+      tzchug: [], extra: [["17:45–18:30","התעמלות קרקע"]] } },
+  { daniel: { end: "11:40", tzaharon: null,
+      school: [["08:00–08:50","תלמיד מלמד"],["08:50–09:35","מתמטיקה"],["10:10–10:55","תנ״ך"],["10:55–11:40","כישורי חיים"]],
+      tzchug: [], extra: [] },
+    naya: { end: "11:40", tzaharon: null,
+      school: [["08:00–08:50","תלמיד מלמד"],["08:50–09:35","חשבון"],["10:10–10:55","מפתח הלב"],["10:55–11:40","בעקבות סיפורים"]],
+      tzchug: [], extra: [] } },
+]};
+
+let activeTab = "homework";
+let schedDay = (() => { const d = new Date().getDay(); return (d >= 0 && d <= 5) ? d : 0; })();
+
+function rangeMinutes(t){
+  const m = t.match(/^(\d{1,2}):(\d{2})–(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  return [+m[1] * 60 + +m[2], +m[3] * 60 + +m[4]];
+}
+
+function fmtMin(m){
+  return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+}
+
+function srow(time, title, tagCls, tagLabel, isNow){
+  return '<div class="srow' + (isNow ? " now" : "") + '"><span class="stime">' + esc(time)
+    + '</span><span class="stitle">' + esc(title) + "</span>"
+    + (isNow ? '<span class="nowtag">עכשיו</span>' : "")
+    + '<span class="stag ' + tagCls + '">' + tagLabel + "</span></div>";
+}
+
+function renderSchedule(){
+  const today = new Date().getDay();
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const isToday = schedDay === today;
+  const chips = document.getElementById("dayChips");
+  chips.innerHTML = [0,1,2,3,4,5].map(d =>
+    '<button class="dchip' + (d === schedDay ? " on" : "") + (d === today ? " today" : "")
+    + '" data-day="' + d + '">' + HEB_DAYS[d] + (d === today ? " · היום" : "") + "</button>").join("");
+  chips.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
+    schedDay = +b.dataset.day;
+    try{ history.replaceState(null, "", "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "")); }catch(e){}
+    renderSchedule();
+  }));
+
+  const day = SCHEDULE.days[schedDay];
+  const isNow = t => {
+    if(!isToday) return false;
+    const r = rangeMinutes(t);
+    return r && nowMin >= r[0] && nowMin < r[1];
+  };
+  let html = '<div class="sched-day">יום ' + HEB_DAYS[schedDay]
+    + (isToday ? '<span class="today-tag">היום</span>' : "") + "</div>";
+  for(const k of ["daniel","naya"]){
+    const kid = KIDS[k];
+    const d = day[k];
+    html += '<section class="child"><div class="child-head"><span class="dot ' + kid.cls
+      + '"></span><h2>' + kid.emoji + " " + kid.name + "</h2></div>";
+    // School lessons, with a break box wherever the gap between two
+    // consecutive lessons is over 5 minutes (e.g. 09:35–10:10, 11:40–12:00).
+    let prevEnd = null;
+    for(const [time, title] of d.school){
+      const r = rangeMinutes(time);
+      if(r && prevEnd !== null && r[0] - prevEnd > 5){
+        const gap = r[0] - prevEnd;
+        const brkTime = fmtMin(prevEnd) + "–" + fmtMin(r[0]);
+        const brkNow = isToday && nowMin >= prevEnd && nowMin < r[0];
+        html += '<div class="srow brk' + (brkNow ? " now" : "") + '"><span class="stime">' + esc(brkTime)
+          + '</span><span class="stitle">☕ הפסקה · ' + gap + ' דקות</span>'
+          + (brkNow ? '<span class="nowtag">עכשיו</span>' : "")
+          + '<span class="stag brk">הפסקה</span></div>';
+      }
+      html += srow(time, title, "school", "בית ספר", isNow(time));
+      if(r) prevEnd = r[1];
+    }
+    html += '<div class="srow"><span class="stime">' + esc(d.end)
+      + '</span><span class="stitle">🏫 סיום בית ספר</span><span class="stag end">סיום</span></div>';
+    if(d.tzaharon){
+      html += '<div class="srow tzbar"><span class="stime">' + esc(d.tzaharon)
+        + '</span><span class="stitle">צהרון</span><span class="stag tzaharon">צהרון</span></div>';
+      for(const [time, title] of d.tzchug) html += srow(time, title, "chug", "חוג צהרון", isNow(time));
+    }
+    for(const [time, title] of (d.extra || [])) html += srow(time, title, "chug", "חוג", isNow(time));
+    html += "</section>";
+  }
+  document.getElementById("schedApp").innerHTML = html;
+}
+
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  document.getElementById("homeworkView").style.display = tab === "homework" ? "block" : "none";
+  document.getElementById("scheduleView").style.display = tab === "schedule" ? "block" : "none";
+  if(tab === "schedule") renderSchedule();
+  try{ history.replaceState(null, "", tab === "schedule" ? "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "") : "#homework"); }catch(e){}
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isoOf = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+const todayISO = () => isoOf(new Date());
+const tomorrowISO = () => { const d = new Date(); d.setDate(d.getDate()+1); return isoOf(d); };
+const HEB_DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+
+function dayName(iso){
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return "";
+  return HEB_DAYS[new Date(+m[1], +m[2]-1, +m[3]).getDay()];
+}
+function shortDate(iso){
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (+m[3]) + "/" + (+m[2]) : "";
+}
+
+function formatUpdated(u){
+  if(!u) return "";
+  const dateOnly = u.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(dateOnly) return (+dateOnly[3]) + "/" + (+dateOnly[2]) + "/" + dateOnly[1];
+  const d = new Date(u);
+  if(isNaN(d)) return u;
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  return d.getDate() + "/" + (d.getMonth()+1) + "/" + d.getFullYear() + ", " + hh + ":" + mm;
+}
+
+function duePill(t){
+  if(t.done) return '<span class="duepill">✅ בוצע</span>';
+  if(!t.due_iso){
+    if(t.due && t.due !== "לא צוין") return '<span class="duepill">' + esc(t.due) + "</span>";
+    return '<span class="duepill">ללא תאריך</span>';
+  }
+  if(t.due_iso === todayISO()) return '<span class="duepill today">להיום · ' + shortDate(t.due_iso) + "</span>";
+  if(t.due_iso === tomorrowISO()) return '<span class="duepill tomorrow">למחר · ' + shortDate(t.due_iso) + "</span>";
+  if(t.due_iso < todayISO()) return '<span class="duepill overdue">באיחור · ' + shortDate(t.due_iso) + "</span>";
+  return '<span class="duepill future">עד ' + dayName(t.due_iso) + " " + shortDate(t.due_iso) + "</span>";
+}
+
+function givenPill(t){
+  if(!t.given_iso) return "";
+  return '<span class="duepill given">ניתנה ' + shortDate(t.given_iso) + "</span>";
+}
+
+function weekShort(w){ return w.replace(/^שבוע\s*/, ""); }
+
+function renderWeekNav(){
+  const nav = document.getElementById("weeknav");
+  if(!WEEKS.weeks.length){ nav.style.display = "none"; return; }
+  nav.style.display = "block";
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  const isCurrent = viewWeek === WEEKS.current;
+  document.getElementById("weekName").textContent = viewWeek;
+  const tag = document.getElementById("weekTag");
+  tag.textContent = isCurrent ? "השבוע" : "שבוע קודם";
+  tag.className = "wtag" + (isCurrent ? "" : " old");
+  document.getElementById("prevWeek").disabled = idx <= 0;
+  document.getElementById("nextWeek").disabled = idx < 0 || idx >= WEEKS.weeks.length - 1;
+
+  const chips = document.getElementById("weekChips");
+  chips.innerHTML = WEEKS.weeks.map(w =>
+    '<button class="wchip' + (w === viewWeek ? " on" : "") + '" data-week="' + esc(w) + '">'
+    + esc(weekShort(w)) + (w === WEEKS.current ? " · השבוע" : "") + "</button>").join("");
+  chips.querySelectorAll(".wchip").forEach(b => {
+    b.addEventListener("click", () => loadWeek(b.dataset.week));
+  });
+
+  const total = DATA.tasks.length;
+  const nw = DATA.tasks.filter(t => t.is_new).length;
+  const nc = DATA.tasks.filter(t => t.carried).length;
+  const nd = DATA.tasks.filter(t => t.done).length;
+  document.getElementById("weekStats").innerHTML =
+    (total ? "<span><b>" + total + "</b> משימות</span>" : "")
+    + (nw ? '<span class="st-new">✨ ' + nw + " חדשות</span>" : "")
+    + (nc ? '<span class="st-carried">🔁 ' + nc + " נגררו משבוע שעבר</span>" : "")
+    + "<span>✅ <b>" + nd + "</b> בוצעו</span>";
+}
+
+function sortTasks(list){
+  // Open first, by due date (earliest first, no date last); done last,
+  // also by due date. Stable for equal keys (sheet order kept).
+  return list.slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const da = a.due_iso || "9999-99-99";
+    const db = b.due_iso || "9999-99-99";
+    if(da !== db) return da < db ? -1 : 1;
+    return 0;
+  });
+}
+
+function render(){
+  renderWeekNav();
+  const lu = document.getElementById("lastUpdated");
+  lu.textContent = DATA.updated ? "🕐 עדכון אחרון: " + formatUpdated(DATA.updated) : "";
+  const sp = document.getElementById("sourcePulls");
+  const parts = [];
+  if(DATA.last_whatsapp) parts.push("נשלף מוואטסאפ: " + formatUpdated(DATA.last_whatsapp));
+  if(DATA.last_webtop) parts.push("נשלף מוובטופ: " + formatUpdated(DATA.last_webtop));
+  sp.textContent = parts.join(" · ");
+  const app = document.getElementById("app");
+  const kids = ["daniel","naya"].filter(k => childFilter === "all" || childFilter === k);
+  let html = "";
+  let totalOpen = 0, totalDone = 0;
+
+  for(const k of kids){
+    const all = DATA.tasks.filter(t => t.child === k);
+    const done = all.filter(t => t.done).length;
+    totalOpen += all.length - done; totalDone += done;
+    let list = all;
+    if(statusFilter === "open") list = all.filter(t => !t.done);
+    if(statusFilter === "done") list = all.filter(t => t.done);
+    list = sortTasks(list);
+    const pct = all.length ? Math.round(done / all.length * 100) : 0;
+    const kid = KIDS[k];
+
+    html += '<section class="child">';
+    html += '<div class="child-head"><span class="dot ' + kid.cls + '"></span><h2>' + kid.emoji + " " + kid.name + "</h2>"
+      + '<span class="count">' + done + " מתוך " + all.length + " בוצעו</span></div>";
+    html += '<div class="bar ' + kid.cls + '"><div style="width:' + pct + '%"></div></div>';
+
+    if(!list.length){
+      html += '<div class="empty">' + (statusFilter === "done" ? "עוד לא סומן שום דבר כבוצע" : "אין משימות פתוחות — כל הכבוד! 🎉") + "</div>";
+    }
+    for(const t of list){
+      const shortTitle = t.short || t.title;
+      const detailsText = (t.details || "").trim();
+      html += '<div class="card' + (t.done ? " done" : "") + '">'
+        + '<div class="card-top">'
+        + '<input type="checkbox" class="check" data-id="' + esc(t.id) + '"' + (t.done ? " checked" : "") + '>'
+        + '<div class="card-main">'
+        + '<div class="title-row"><div class="title">' + esc(shortTitle) + "</div>" + duePill(t) + givenPill(t) + "</div>"
+        + '<div class="tags">'
+        + (t.subject ? '<span class="tag">' + esc(t.subject) + "</span>" : "")
+        + (t.kind ? '<span class="tag">' + esc(t.kind) + "</span>" : "")
+        + (t.carried ? '<span class="tag carried">🔁 נגרר משבוע שעבר</span>' : "")
+        + (t.is_new ? '<span class="tag isnew">✨ חדש השבוע</span>' : "")
+        + "</div>"
+        + "</div></div>"
+        + '<button class="details-btn" data-id="' + esc(t.id) + '">פירוט ▾</button>'
+        + '<div class="details" id="det-' + esc(t.id) + '">'
+        + (detailsText ? '<div class="details-text">' + esc(detailsText) + "</div>" : "")
+        + '<div class="details-meta">' + [t.due ? "מועד: " + esc(t.due) : "", t.source ? "מקור: " + esc(t.source) : ""].filter(Boolean).join(" · ") + "</div>";
+      if(t.links && t.links.length){
+        html += '<div class="links">' + t.links.map(l =>
+          '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + "</a>").join("") + "</div>";
+      }
+      html += "</div></div>";
+    }
+    html += "</section>";
+  }
+  if(childFilter === "all" && totalOpen === 0 && totalDone > 0){
+    html += '<div class="alldone">🎉 כל המשימות של השבוע בוצעו!</div>';
+  }
+  app.innerHTML = html;
+
+  app.querySelectorAll(".check").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = cb.dataset.id;
+      const done = cb.checked;
+      const card = cb.closest(".card");
+      card.classList.toggle("done", done);
+      try{
+        await fetchJSON("/api/tasks/" + encodeURIComponent(id) + "/done?week=" + encodeURIComponent(viewWeek), {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({done})
+        }, 5);
+        const t = DATA.tasks.find(x => x.id === id);
+        if(t) t.done = done;
+        render();
+      }catch(e){
+        cb.checked = !done;
+        card.classList.toggle("done", !done);
+        alert("הסימון לא נשמר — נסו שוב.");
+      }
+    });
+  });
+
+  app.querySelectorAll(".details-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const det = document.getElementById("det-" + btn.dataset.id);
+      const open = det.classList.toggle("open");
+      btn.textContent = open ? "פירוט ▴" : "פירוט ▾";
+    });
+  });
+}
+
+async function fetchJSON(url, opts, attempts){
+  attempts = attempts || 6;
+  let delay = 300;
+  for(let i = 0; i < attempts; i++){
+    try{
+      const r = await fetch(url, opts);
+      if(!r.ok) throw new Error("http " + r.status);
+      return await r.json();
+    }catch(e){
+      if(i === attempts - 1) throw e;
+      await new Promise(res => setTimeout(res, delay));
+      delay = Math.min(delay * 2, 3000);
+    }
+  }
+}
+
+async function loadWeek(week){
+  try{
+    DATA = await fetchJSON("/api/tasks?week=" + encodeURIComponent(week));
+    viewWeek = DATA.week || week;
+    document.getElementById("err").style.display = "none";
+    render();
+  }catch(e){
+    document.getElementById("err").style.display = "block";
+  }
+}
+
+async function load(){
+  try{
+    WEEKS = await fetchJSON("/api/weeks");
+    viewWeek = WEEKS.current || "";
+    if(viewWeek) await loadWeek(viewWeek);
+    else { DATA = await fetchJSON("/api/tasks"); render(); }
+  }catch(e){
+    document.getElementById("err").style.display = "block";
+  }
+}
+
+document.querySelectorAll(".tab").forEach(b => {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+});
+document.getElementById("prevWeek").addEventListener("click", () => {
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  if(idx > 0) loadWeek(WEEKS.weeks[idx - 1]);
+});
+document.getElementById("nextWeek").addEventListener("click", () => {
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  if(idx >= 0 && idx < WEEKS.weeks.length - 1) loadWeek(WEEKS.weeks[idx + 1]);
+});
+document.querySelectorAll("#statusFilters .chip").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#statusFilters .chip").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    statusFilter = b.dataset.status;
+    render();
+  });
+});
+document.querySelectorAll("#childFilters .chip").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#childFilters .chip").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    childFilter = b.dataset.child;
+    render();
+  });
+});
+
+document.getElementById("shareSched").addEventListener("click", async () => {
+  const btn = document.getElementById("shareSched");
+  const url = location.origin + location.pathname + "#schedule-" + schedDay;
+  try{
+    await navigator.clipboard.writeText(url);
+    btn.textContent = "✅ הקישור הועתק";
+  }catch(e){
+    window.prompt("העתיקו את הקישור:", url);
+    return;
+  }
+  setTimeout(() => { btn.textContent = "🔗 העתק קישור ליום הזה"; }, 2500);
+});
+
+(function initTabFromHash(){
+  const h = (location.hash || "").replace(/^#/, "");
+  if(h === "homework"){ switchTab("homework"); return; }
+  if(h === "schedule"){ switchTab("schedule"); return; }
+  const m = h.match(/^schedule-([0-5])$/);
+  if(m){ schedDay = +m[1]; switchTab("schedule"); }
+})();
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[Unit]
+Description=Homework tunnel connector (second cloudflared for homework.oedinger.stream)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --config /home/oedinger/homework/cloudflared.yml run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

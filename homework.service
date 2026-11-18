@@ -1,0 +1,13 @@
+[Unit]
+Description=Kids homework tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/oedinger/homework/server.py
+WorkingDirectory=/home/oedinger/homework
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

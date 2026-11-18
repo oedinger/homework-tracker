@@ -1,0 +1,13 @@
+tunnel: pi-agent
+credentials-file: /home/oedinger/.cloudflared/b5fe22b5-fba2-4d4b-84c6-5310c57758fc.json
+
+ingress:
+  - hostname: portfolio.oedinger.stream
+    service: http://localhost:8080
+  - hostname: ha.oedinger.stream
+    service: http://localhost:8123
+  - hostname: ssh.oedinger.stream
+    service: ssh://localhost:22
+  - hostname: homework.oedinger.stream
+    service: http://localhost:8081
+  - service: http_status:404
