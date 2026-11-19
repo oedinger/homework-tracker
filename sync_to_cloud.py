@@ -167,6 +167,23 @@ def _urlopen_with_retries(req, attempts=4):
     raise last
 
 
+def curl_get_json(url):
+    """GET JSON via curl. Python urllib consistently gets truncated
+    responses (IncompleteRead/RemoteDisconnected) from the Cloudflare
+    Worker on this VM->Cloudflare path — the ~20KB state body is cut
+    mid-read every time — while curl returns the full body. Used for
+    the post-sync verification read-back (the POST itself is small
+    and works fine over urllib)."""
+    r = subprocess.run(
+        ["curl", "-s", "-m", "60", "-A",
+         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+         "(KHTML, like Gecko) Chrome/120.0 Safari/537.36", url],
+        capture_output=True, text=True, timeout=90)
+    if r.returncode != 0:
+        raise RuntimeError(f"curl GET failed rc={r.returncode}: {r.stderr[:200]}")
+    return json.loads(r.stdout)
+
+
 def post_sync(payload, verify_week=None):
     """POST the payload; the edge sometimes drops the response even when the
     Worker applied it, so verify by reading the state back. KV reads lag
@@ -189,13 +206,11 @@ def post_sync(payload, verify_week=None):
     # Verify from the live state (poll — KV reads lag the write).
     import time
     want_week = verify_week or payload["week"]
-    get_req = urllib.request.Request(
-        SYNC_URL.replace("/api/sync", "/api/tasks")
-        + "?week=" + urllib.parse.quote(want_week),
-        headers={"User-Agent": headers["User-Agent"]})
+    get_url = (SYNC_URL.replace("/api/sync", "/api/tasks")
+               + "?week=" + urllib.parse.quote(want_week))
     for _ in range(6):
         try:
-            state = json.loads(_urlopen_with_retries(get_req))
+            state = curl_get_json(get_url)
         except Exception:
             state = {}
         if (state.get("week") == want_week
