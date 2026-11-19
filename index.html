@@ -6,13 +6,14 @@
 <title>שיעורי בית — דניאל ונאיה</title>
 <style>
   :root{
-    --bg:#f6f4ef; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --bg:#fdf6ec; --card:#fffdf8; --ink:#2e2a25; --muted:#8a7d6d;
+    --accent:#d97757; --accent-soft:#fdeee6;
     --daniel:#2563eb; --daniel-soft:#dbeafe;
     --naya:#db2777; --naya-soft:#fce7f3;
     --green:#16a34a; --green-soft:#dcfce7;
     --amber:#b45309; --amber-soft:#fef3c7;
     --red:#dc2626; --red-soft:#fee2e2;
-    --line:#e5e0d8; --radius:16px;
+    --line:#f0e3d3; --radius:20px;
   }
   *{box-sizing:border-box}
   body{
@@ -22,8 +23,17 @@
   }
   .wrap{max-width:720px; margin:0 auto; padding:18px 14px 48px}
   header{margin:4px 4px 12px}
-  h1{font-size:26px; margin:0 0 4px}
+  h1{font-size:28px; margin:0 0 4px}
   .sub{color:var(--muted); font-size:14px}
+  .syncrow{display:flex; align-items:center; gap:10px; margin:12px 4px 0}
+  .syncbtn{
+    flex:none; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:999px; padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer;
+    box-shadow:0 2px 8px rgba(93,64,28,.06);
+  }
+  .syncbtn:disabled{opacity:.6; cursor:default}
+  .syncbtn:active{background:var(--accent-soft)}
+  .syncstatus{font-size:13px; color:var(--muted)}
   .updated{font-size:14px; font-weight:700; margin-top:6px}
   .sources{font-size:13px; color:var(--muted); margin-top:4px}
 
@@ -56,7 +66,7 @@
     flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink);
     border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600;
   }
-  .wchip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .wchip.on{border-color:var(--accent); background:var(--accent); color:#fff}
   .weekstats{
     display:flex; flex-wrap:wrap; gap:6px 14px; margin:2px 4px 4px;
     font-size:13px; color:var(--muted);
@@ -70,7 +80,7 @@
     border:1.5px solid var(--line); background:#fff; color:var(--ink);
     border-radius:999px; padding:8px 14px; font-size:14px; cursor:pointer;
   }
-  .chip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .chip.on{border-color:var(--accent); background:var(--accent); color:#fff}
   .chip.daniel.on{border-color:var(--daniel); background:var(--daniel)}
   .chip.naya.on{border-color:var(--naya); background:var(--naya)}
 
@@ -88,7 +98,7 @@
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
     padding:14px 14px 0; margin-bottom:10px;
-    box-shadow:0 1px 2px rgba(0,0,0,.04);
+    box-shadow:0 2px 10px rgba(93,64,28,.05);
   }
   .card.done{opacity:.62}
   .card.done .title{text-decoration:line-through}
@@ -149,12 +159,12 @@
 
   /* ---- tabs ---- */
   .tabs{display:flex; gap:8px; margin:12px 4px 4px}
-  .tab{flex:1; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:10px 8px; font-size:15px; font-weight:700; cursor:pointer}
-  .tab.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .tab{flex:1; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:10px 6px; font-size:14px; font-weight:700; cursor:pointer}
+  .tab.on{border-color:var(--accent); background:var(--accent); color:#fff}
   .daychips{display:flex; gap:6px; overflow-x:auto; padding:10px 2px 2px; scrollbar-width:none; margin:8px 4px}
   .daychips::-webkit-scrollbar{display:none}
   .dchip{flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600}
-  .dchip.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .dchip.on{border-color:var(--accent); background:var(--accent); color:#fff}
   .dchip.today{border-color:var(--daniel)}
   .sched-day{font-size:18px; font-weight:800; margin:14px 4px 4px}
   .sched-day .today-tag{font-size:11px; font-weight:700; color:var(--green); background:var(--green-soft); border-radius:999px; padding:2px 8px; margin-inline-start:6px; vertical-align:2px}
@@ -175,18 +185,59 @@
   .sched-note{font-size:12px; color:var(--muted); margin:14px 4px; line-height:1.6}
   .sharebtn{display:block; width:calc(100% - 8px); margin:10px 4px; padding:11px; border:1.5px solid var(--line); background:#fff; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; color:var(--ink)}
   .sharebtn:active{background:#f3f4f6}
+
+  /* ---- reminders ---- */
+  .rem-date-row{display:flex; gap:8px; align-items:center; margin:10px 4px}
+  .rem-date-row input[type="date"]{
+    flex:1; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:12px; padding:9px 10px; font-size:15px; font-family:inherit;
+  }
+  .rem-today{flex:none; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer}
+  .rem-form{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px; margin:10px 4px; box-shadow:0 2px 10px rgba(93,64,28,.05);
+  }
+  .rem-form input[type="text"]{
+    width:100%; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:12px; padding:11px 12px; font-size:16px; font-family:inherit; margin-bottom:8px;
+  }
+  .rem-form-row{display:flex; gap:8px}
+  .rem-form-row input[type="time"], .rem-form-row select{
+    flex:1; min-width:0; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:12px; padding:9px 10px; font-size:14px; font-family:inherit;
+  }
+  .rem-add{
+    width:100%; margin-top:10px; border:none; background:var(--accent); color:#fff;
+    border-radius:999px; padding:12px; font-size:15px; font-weight:800; cursor:pointer;
+  }
+  .rem-add:disabled{opacity:.6}
+  .rem-sec{font-size:16px; font-weight:800; margin:18px 4px 6px}
+  .rem-row{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px; margin:0 4px 6px}
+  .rem-row.done{opacity:.6}
+  .rem-row.done .rem-text{text-decoration:line-through}
+  .rem-check{flex:none; width:26px; height:26px; margin-top:1px; cursor:pointer; accent-color:var(--green); transform:scale(1.2)}
+  .rem-main{flex:1; min-width:0}
+  .rem-text{font-weight:700; font-size:15px; line-height:1.4}
+  .rem-meta{font-size:13px; color:var(--muted); margin-top:3px}
+  .rem-del{flex:none; border:none; background:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px}
+  .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>📚 דניאל ונאיה</h1>
-    <div class="sub">שיעורי בית ומערכת שעות</div>
+    <div class="sub">שיעורי בית, מערכת שעות ותזכורות — הכל במקום אחד 🌼</div>
+    <div class="syncrow">
+      <button class="syncbtn" id="syncBtn">🔄 סנכרן</button>
+      <span class="syncstatus" id="syncStatus"></span>
+    </div>
   </header>
 
   <nav class="tabs">
     <button class="tab on" data-tab="homework">📚 שיעורי בית</button>
     <button class="tab" data-tab="schedule">🗓️ מערכת שעות</button>
+    <button class="tab" data-tab="reminders">⏰ תזכורות</button>
   </nav>
 
   <div class="err" id="err">לא הצלחתי לטעון את המשימות — נסו לרענן את הדף.</div>
@@ -228,6 +279,27 @@
     <div class="sched-note">שעות השיעורים של נאיה לפי פעמוני בית הספר (כמו ג׳3) — אושרו התחלה 8:00 וסיום 12:45, שישי 11:40. מקורות: מערכת ג׳3 (ליאור, 11/9) · מערכת א׳2 (מורן, 4/11) · מערכת חוגים א2 (17/11) · יומן חוגים.</div>
   </div>
 
+  <div id="remindersView" style="display:none">
+    <div class="rem-date-row">
+      <input type="date" id="remDate" aria-label="תאריך">
+      <button class="rem-today" id="remToday">היום</button>
+    </div>
+    <div class="rem-form">
+      <input type="text" id="remText" placeholder="מה להזכיר? למשל: להביא חולצת ספורט" maxlength="200">
+      <div class="rem-form-row">
+        <input type="time" id="remTime" aria-label="שעה">
+        <select id="remChild" aria-label="למי">
+          <option value="all">שני הילדים</option>
+          <option value="daniel">🔵 דניאל</option>
+          <option value="naya">🩷 נאיה</option>
+        </select>
+      </div>
+      <button class="rem-add" id="remAdd">＋ הוסף תזכורת</button>
+    </div>
+    <div id="remApp"></div>
+    <div class="sched-note">התזכורות נשמרות באתר ומשותפות לשניכם — מה שאחד מוסיף, השני רואה. הן לא נכנסות לגיליון שיעורי הבית.</div>
+  </div>
+
   <footer>
     מקור המשימות: גיליון שיעורי הבית • הסימונים נשמרים ומסונכרנים בין כולם<br>
     מערכת שעות: מערכות בית הספר והחוגים כפי שנמסרו • נבנה לשימוש המשפחה
@@ -244,6 +316,11 @@ let DATA = { week: "", updated: "", tasks: [] };
 let viewWeek = "";
 let statusFilter = "open";
 let childFilter = "all";
+
+/* ---- reminders (shared, stored in KV via /api/reminders) ---- */
+let REMINDERS = [];
+let remDate = ""; // set to today on first render (todayISO is defined below)
+let lastLoadAt = 0;
 
 /* ---- weekly timetable (static reference data, updated 17/11/2026) ----
    Sources: Daniel g3 PDF (Lior, 11/9) · Naya a2 PDF (Moran, 4/11) ·
@@ -373,8 +450,156 @@ function switchTab(tab){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   document.getElementById("homeworkView").style.display = tab === "homework" ? "block" : "none";
   document.getElementById("scheduleView").style.display = tab === "schedule" ? "block" : "none";
+  document.getElementById("remindersView").style.display = tab === "reminders" ? "block" : "none";
   if(tab === "schedule") renderSchedule();
-  try{ history.replaceState(null, "", tab === "schedule" ? "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "") : "#homework"); }catch(e){}
+  if(tab === "reminders") renderReminders();
+  try{
+    const h = tab === "homework" ? "#homework"
+      : tab === "reminders" ? "#reminders"
+      : "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "");
+    history.replaceState(null, "", h);
+  }catch(e){}
+}
+
+/* ---- reminders tab ---- */
+function remSort(list){
+  return list.slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const ta = a.time || "99:99", tb = b.time || "99:99";
+    if(ta !== tb) return ta < tb ? -1 : 1;
+    return (a.created || "") < (b.created || "") ? -1 : 1;
+  });
+}
+
+function remRow(r){
+  const kid = r.child && KIDS[r.child] ? KIDS[r.child].emoji + " " + KIDS[r.child].name : "שני הילדים";
+  const meta = [r.time ? "🕐 " + esc(r.time) : "", kid].filter(Boolean).join(" · ");
+  return '<div class="rem-row' + (r.done ? " done" : "") + '">'
+    + '<input type="checkbox" class="rem-check" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
+    + '<div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + "</div>"
+    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div>';
+}
+
+function renderReminders(){
+  if(!remDate) remDate = todayISO();
+  const dateInput = document.getElementById("remDate");
+  if(dateInput && dateInput.value !== remDate) dateInput.value = remDate;
+  const isToday = remDate === todayISO();
+  const d = new Date(remDate + "T12:00:00");
+  const dayLabel = isToday ? "היום" : "יום " + HEB_DAYS[d.getDay()];
+  let html = '<div class="sched-day">' + dayLabel + " · " + shortDate(remDate)
+    + (isToday ? '<span class="today-tag">היום</span>' : "") + "</div>";
+
+  // Overdue undone reminders (only when looking at today).
+  const overdue = isToday ? REMINDERS.filter(r => !r.done && r.date < remDate) : [];
+  if(overdue.length){
+    html += '<div class="rem-sec">⏰ שעבר זמנן</div>';
+    html += remSort(overdue).map(remRow).join("");
+  }
+
+  const list = REMINDERS.filter(r => r.date === remDate);
+  html += '<div class="rem-sec">🔔 תזכורות ליום הזה</div>';
+  html += list.length ? remSort(list).map(remRow).join("")
+    : '<div class="rem-empty">אין תזכורות ליום הזה — הוסיפו אחת למעלה 🙂</div>';
+
+  // Homework tasks due on this day (from the sheet, read-only here).
+  const due = DATA.tasks.filter(t => t.due_iso === remDate && !t.done);
+  if(due.length){
+    html += '<div class="rem-sec">📚 מטלות שצריכות להסתיים ' + (isToday ? "היום" : "ביום הזה") + "</div>";
+    html += due.map(t => {
+      const kid = KIDS[t.child] || {};
+      return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(t.short || t.title) + "</div>"
+        + '<div class="rem-meta">' + (kid.emoji || "") + " " + (kid.name || "") + (t.subject ? " · " + esc(t.subject) : "") + "</div></div></div>";
+    }).join("");
+  }
+  document.getElementById("remApp").innerHTML = html;
+
+  document.querySelectorAll("#remApp .rem-check").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = cb.dataset.id, done = cb.checked;
+      cb.closest(".rem-row").classList.toggle("done", done);
+      try{
+        await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/done", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({done})
+        }, 3);
+        const r = REMINDERS.find(x => x.id === id);
+        if(r) r.done = done;
+        renderReminders();
+      }catch(e){
+        cb.checked = !done;
+        cb.closest(".rem-row").classList.toggle("done", !done);
+        alert("הסימון לא נשמר — נסו שוב.");
+      }
+    });
+  });
+  document.querySelectorAll("#remApp .rem-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if(!confirm("למחוק את התזכורת?")) return;
+      try{
+        await fetchJSON("/api/reminders/" + encodeURIComponent(id), {method: "DELETE"}, 3);
+        REMINDERS = REMINDERS.filter(x => x.id !== id);
+        renderReminders();
+      }catch(e){ alert("המחיקה נכשלה — נסו שוב."); }
+    });
+  });
+}
+
+async function loadReminders(){
+  try{
+    const data = await fetchJSON("/api/reminders", null, 3);
+    REMINDERS = data.reminders || [];
+    if(activeTab === "reminders") renderReminders();
+  }catch(e){ /* reminders stay as-is; the tab shows the empty state */ }
+}
+
+async function addReminder(){
+  const textEl = document.getElementById("remText");
+  const text = (textEl.value || "").trim();
+  if(!text){ textEl.focus(); return; }
+  const btn = document.getElementById("remAdd");
+  btn.disabled = true;
+  try{
+    const created = await fetchJSON("/api/reminders", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text,
+        date: remDate || todayISO(),
+        time: document.getElementById("remTime").value || "",
+        child: document.getElementById("remChild").value || "all"
+      })
+    }, 3);
+    if(created.reminder) REMINDERS.push(created.reminder);
+    textEl.value = "";
+    document.getElementById("remTime").value = "";
+    renderReminders();
+  }catch(e){ alert("התזכורת לא נשמרה — נסו שוב."); }
+  btn.disabled = false;
+}
+
+/* ---- sync: reload the site's data from the server ---- */
+function setSyncStatus(msg){ document.getElementById("syncStatus").textContent = msg; }
+
+async function syncNow(){
+  const btn = document.getElementById("syncBtn");
+  btn.disabled = true;
+  btn.textContent = "מסנכרן…";
+  try{
+    WEEKS = await fetchJSON("/api/weeks");
+    if(viewWeek) await loadWeek(viewWeek);
+    else { DATA = await fetchJSON("/api/tasks"); render(); }
+    await loadReminders();
+    lastLoadAt = Date.now();
+    const now = new Date();
+    setSyncStatus("✅ סונכרן " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
+      + (DATA.updated ? " · נתוני הגיליון מ־" + formatUpdated(DATA.updated) : ""));
+  }catch(e){
+    setSyncStatus("⚠️ הסנכרון נכשל — נסו שוב");
+  }
+  btn.textContent = "🔄 סנכרן";
+  btn.disabled = false;
 }
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -471,6 +696,7 @@ function render(){
   renderWeekNav();
   const lu = document.getElementById("lastUpdated");
   lu.textContent = DATA.updated ? "🕐 עדכון אחרון: " + formatUpdated(DATA.updated) : "";
+  if(DATA.updated) setSyncStatus("נתוני הגיליון עודכנו: " + formatUpdated(DATA.updated));
   const sp = document.getElementById("sourcePulls");
   const parts = [];
   if(DATA.last_whatsapp) parts.push("נשלף מוואטסאפ: " + formatUpdated(DATA.last_whatsapp));
@@ -596,6 +822,8 @@ async function load(){
     viewWeek = WEEKS.current || "";
     if(viewWeek) await loadWeek(viewWeek);
     else { DATA = await fetchJSON("/api/tasks"); render(); }
+    lastLoadAt = Date.now();
+    await loadReminders();
   }catch(e){
     document.getElementById("err").style.display = "block";
   }
@@ -629,6 +857,25 @@ document.querySelectorAll("#childFilters .chip").forEach(b => {
   });
 });
 
+document.getElementById("syncBtn").addEventListener("click", syncNow);
+document.addEventListener("visibilitychange", () => {
+  // Coming back to the app after a while: refresh silently.
+  if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) syncNow();
+});
+
+document.getElementById("remDate").addEventListener("change", (e) => {
+  remDate = e.target.value || todayISO();
+  renderReminders();
+});
+document.getElementById("remToday").addEventListener("click", () => {
+  remDate = todayISO();
+  renderReminders();
+});
+document.getElementById("remAdd").addEventListener("click", addReminder);
+document.getElementById("remText").addEventListener("keydown", (e) => {
+  if(e.key === "Enter") addReminder();
+});
+
 document.getElementById("shareSched").addEventListener("click", async () => {
   const btn = document.getElementById("shareSched");
   const url = location.origin + location.pathname + "#schedule-" + schedDay;
@@ -646,6 +893,7 @@ document.getElementById("shareSched").addEventListener("click", async () => {
   const h = (location.hash || "").replace(/^#/, "");
   if(h === "homework"){ switchTab("homework"); return; }
   if(h === "schedule"){ switchTab("schedule"); return; }
+  if(h === "reminders"){ switchTab("reminders"); return; }
   const m = h.match(/^schedule-([0-5])$/);
   if(m){ schedDay = +m[1]; switchTab("schedule"); }
 })();

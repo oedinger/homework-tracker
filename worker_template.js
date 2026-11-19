@@ -60,6 +60,17 @@ function findTask(doc, child, title) {
   return doc.tasks.find((t) => t.child === child && t.title === title) || null;
 }
 
+// ---- shared reminders (KV key "reminders", one array, max 200) ----
+async function getReminders(env) {
+  return (await env.HOMEWORK_KV.get('reminders', 'json')) || [];
+}
+async function putReminders(env, list) {
+  await env.HOMEWORK_KV.put('reminders', JSON.stringify(list.slice(-200)));
+}
+function reminderId() {
+  return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -92,6 +103,51 @@ export default {
       task.done = !!body.done;
       await env.HOMEWORK_KV.put(weekKey(doc.week), JSON.stringify(doc));
       return json(task);
+    }
+
+    // ---- reminders ----
+    if (path === '/api/reminders' && request.method === 'GET') {
+      return json({ reminders: await getReminders(env) });
+    }
+    if (path === '/api/reminders' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const text = String(body.text || '').trim().slice(0, 200);
+      const date = String(body.date || '');
+      if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return json({ error: 'text and date (YYYY-MM-DD) are required' }, 400);
+      }
+      const time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? body.time : '';
+      const child = ['all', 'daniel', 'naya'].includes(body.child) ? body.child : 'all';
+      const reminder = {
+        id: reminderId(), text, date, time, child, done: false,
+        created: new Date().toISOString(),
+      };
+      const list = await getReminders(env);
+      list.push(reminder);
+      await putReminders(env, list);
+      return json({ reminder }, 201);
+    }
+    const remDoneMatch = path.match(/^\/api\/reminders\/([^/]+)\/done$/);
+    if (remDoneMatch && request.method === 'POST') {
+      const id = decodeURIComponent(remDoneMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const list = await getReminders(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      r.done = !!body.done;
+      await putReminders(env, list);
+      return json(r);
+    }
+    const remDelMatch = path.match(/^\/api\/reminders\/([^/]+)$/);
+    if (remDelMatch && request.method === 'DELETE') {
+      const id = decodeURIComponent(remDelMatch[1]);
+      const list = await getReminders(env);
+      const kept = list.filter((x) => x.id !== id);
+      if (kept.length === list.length) return json({ error: 'not found' }, 404);
+      await putReminders(env, kept);
+      return json({ ok: true });
     }
 
     if (path === '/api/sync' && request.method === 'POST') {
