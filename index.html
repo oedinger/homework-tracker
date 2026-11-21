@@ -230,6 +230,7 @@
     <div class="sub">שיעורי בית, מערכת שעות ותזכורות — הכל במקום אחד 🌼</div>
     <div class="syncrow">
       <button class="syncbtn" id="syncBtn">🔄 סנכרן</button>
+      <button class="syncbtn" id="designToggle">✨ עיצוב חדש</button>
       <span class="syncstatus" id="syncStatus"></span>
     </div>
   </header>
@@ -858,6 +859,11 @@ document.querySelectorAll("#childFilters .chip").forEach(b => {
 });
 
 document.getElementById("syncBtn").addEventListener("click", syncNow);
+document.getElementById("designToggle").addEventListener("click", () => {
+  const u = new URL(location.href);
+  u.searchParams.set("design", "new");
+  location.href = u.toString();
+});
 document.addEventListener("visibilitychange", () => {
   // Coming back to the app after a while: refresh silently.
   if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) syncNow();

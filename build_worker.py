@@ -6,7 +6,9 @@ import os
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 html = open(os.path.join(BASE, "index.html"), encoding="utf-8").read()
+html_new = open(os.path.join(BASE, "index-new.html"), encoding="utf-8").read()
 tpl = open(os.path.join(BASE, "worker_template.js"), encoding="utf-8").read()
 out = tpl.replace("__HTML_JSON__", json.dumps(html, ensure_ascii=False))
+out = out.replace("__HTML_NEW_JSON__", json.dumps(html_new, ensure_ascii=False))
 open(os.path.join(BASE, "worker.js"), "w", encoding="utf-8").write(out)
 print("worker.js bytes:", len(out))

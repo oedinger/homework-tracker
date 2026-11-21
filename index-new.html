@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>שיעורי בית — דניאל ונאיה</title>
+<style>
+  :root{
+    --bg:#fdf6ec; --card:#fffdf8; --ink:#2e2a25; --muted:#8a7d6d;
+    --accent:#d97757; --accent-soft:#fdeee6;
+    --daniel:#2563eb; --daniel-soft:#dbeafe;
+    --naya:#db2777; --naya-soft:#fce7f3;
+    --green:#16a34a; --green-soft:#dcfce7;
+    --amber:#b45309; --amber-soft:#fef3c7;
+    --red:#dc2626; --red-soft:#fee2e2;
+    --line:#f0e3d3; --radius:20px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:18px 14px 48px}
+  header{margin:4px 4px 12px}
+  h1{font-size:28px; margin:0 0 4px}
+  .sub{color:var(--muted); font-size:14px}
+  .syncrow{display:flex; align-items:center; gap:10px; margin:12px 4px 0}
+  .syncbtn{
+    flex:none; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:999px; padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer;
+    box-shadow:0 2px 8px rgba(93,64,28,.06);
+  }
+  .syncbtn:disabled{opacity:.6; cursor:default}
+  .syncbtn:active{background:var(--accent-soft)}
+  .syncstatus{font-size:13px; color:var(--muted)}
+  .updated{font-size:14px; font-weight:700; margin-top:6px}
+  .sources{font-size:13px; color:var(--muted); margin-top:4px}
+
+  /* ---- week navigator ---- */
+  .weeknav{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 10px; margin:12px 0 10px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .weeknav-row{display:flex; align-items:center; gap:6px}
+  .navbtn{
+    flex:none; width:38px; height:38px; border-radius:50%;
+    border:1.5px solid var(--line); background:#fff; font-size:18px; cursor:pointer;
+    color:var(--ink); line-height:1;
+  }
+  .navbtn:disabled{opacity:.3; cursor:default}
+  .weeklabel{flex:1; text-align:center; min-width:0}
+  .weeklabel .wname{font-size:18px; font-weight:800}
+  .weeklabel .wtag{
+    display:inline-block; font-size:11px; font-weight:700; color:var(--green);
+    background:var(--green-soft); border-radius:999px; padding:2px 8px; margin-inline-start:6px;
+    vertical-align:2px;
+  }
+  .weeklabel .wtag.old{color:var(--muted); background:#f3f4f6}
+  .weekchips{
+    display:flex; gap:6px; overflow-x:auto; padding:10px 2px 2px;
+    scrollbar-width:none;
+  }
+  .weekchips::-webkit-scrollbar{display:none}
+  .wchip{
+    flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .wchip.on{border-color:var(--accent); background:var(--accent); color:#fff}
+  .weekstats{
+    display:flex; flex-wrap:wrap; gap:6px 14px; margin:2px 4px 4px;
+    font-size:13px; color:var(--muted);
+  }
+  .weekstats b{color:var(--ink)}
+  .weekstats .st-new{color:#15803d; font-weight:700}
+  .weekstats .st-carried{color:var(--amber); font-weight:700}
+
+  .filters{display:flex; flex-wrap:wrap; gap:8px; margin:12px 4px}
+  .chip{
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:999px; padding:8px 14px; font-size:14px; cursor:pointer;
+  }
+  .chip.on{border-color:var(--accent); background:var(--accent); color:#fff}
+  .chip.daniel.on{border-color:var(--daniel); background:var(--daniel)}
+  .chip.naya.on{border-color:var(--naya); background:var(--naya)}
+
+  .child{margin-top:18px}
+  .child-head{display:flex; align-items:baseline; gap:10px; padding:0 4px 8px}
+  .dot{width:14px; height:14px; border-radius:50%; flex:none; transform:translateY(1px)}
+  .dot.daniel{background:var(--daniel)} .dot.naya{background:var(--naya)}
+  .child-head h2{font-size:20px; margin:0}
+  .count{color:var(--muted); font-size:13px; margin-inline-start:auto}
+  .bar{height:8px; background:#e7e2d9; border-radius:99px; overflow:hidden; margin:0 4px 10px}
+  .bar > div{height:100%; border-radius:99px; transition:width .3s}
+  .bar.daniel > div{background:var(--daniel)}
+  .bar.naya > div{background:var(--naya)}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 14px 0; margin-bottom:10px;
+    box-shadow:0 2px 10px rgba(93,64,28,.05);
+  }
+  .card.done{opacity:.62}
+  .card.done .title{text-decoration:line-through}
+  .card-top{display:flex; gap:12px; align-items:flex-start}
+  .check{
+    flex:none; width:30px; height:30px; margin-top:2px; cursor:pointer;
+    accent-color:var(--green); transform:scale(1.25);
+  }
+  .card-main{flex:1; min-width:0}
+  .title-row{display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap}
+  .title{font-size:17px; font-weight:700; line-height:1.4; flex:1; min-width:140px}
+  .duepill{
+    flex:none; font-size:14px; font-weight:800; border-radius:999px;
+    padding:5px 12px; white-space:nowrap;
+    background:#f3f4f6; color:var(--muted);
+  }
+  .duepill.today{background:var(--red-soft); color:var(--red)}
+  .duepill.tomorrow{background:var(--amber-soft); color:var(--amber)}
+  .duepill.overdue{background:var(--red-soft); color:var(--red)}
+  .duepill.future{background:var(--daniel-soft); color:var(--daniel)}
+  .duepill.given{background:#f3f4f6; color:var(--muted)}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .tag{
+    font-size:12px; font-weight:700; border-radius:999px; padding:3px 9px;
+    background:#f3f4f6; color:var(--muted);
+  }
+  .tag.carried{background:var(--amber-soft); color:var(--amber)}
+  .tag.isnew{background:var(--green-soft); color:#15803d}
+  .details-btn{
+    display:block; width:100%; margin-top:10px; padding:10px 4px;
+    border:none; border-top:1px solid var(--line); background:none;
+    color:var(--daniel); font-size:14px; font-weight:700; cursor:pointer;
+    text-align:center;
+  }
+  .details{display:none; padding:0 0 14px}
+  .details.open{display:block}
+  .details-text{font-size:15px; line-height:1.65; margin:4px 0 8px}
+  .details-meta{color:var(--muted); font-size:13px; line-height:1.6}
+  .links{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+  .links a{
+    font-size:13px; color:var(--daniel); background:var(--daniel-soft);
+    border-radius:999px; padding:5px 11px; text-decoration:none; font-weight:600;
+  }
+  .empty{
+    text-align:center; color:var(--muted); padding:28px 10px; font-size:15px;
+    background:var(--card); border:1px dashed var(--line); border-radius:var(--radius);
+  }
+  .alldone{
+    text-align:center; padding:22px 10px; font-size:18px; font-weight:700;
+    background:var(--green-soft); color:var(--green);
+    border-radius:var(--radius); margin-top:6px;
+  }
+  footer{color:var(--muted); font-size:12px; text-align:center; margin-top:26px; line-height:1.7}
+  .err{
+    display:none; background:var(--red-soft); color:var(--red); border-radius:12px;
+    padding:12px; margin:10px 4px; font-size:14px; text-align:center;
+  }
+
+  /* ---- tabs ---- */
+  .tabs{display:flex; gap:8px; margin:12px 4px 4px}
+  .tab{flex:1; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:10px 6px; font-size:14px; font-weight:700; cursor:pointer}
+  .tab.on{border-color:var(--accent); background:var(--accent); color:#fff}
+  .daychips{display:flex; gap:6px; overflow-x:auto; padding:10px 2px 2px; scrollbar-width:none; margin:8px 4px}
+  .daychips::-webkit-scrollbar{display:none}
+  .dchip{flex:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; font-weight:600}
+  .dchip.on{border-color:var(--accent); background:var(--accent); color:#fff}
+  .dchip.today{border-color:var(--daniel)}
+  .sched-day{font-size:18px; font-weight:800; margin:14px 4px 4px}
+  .sched-day .today-tag{font-size:11px; font-weight:700; color:var(--green); background:var(--green-soft); border-radius:999px; padding:2px 8px; margin-inline-start:6px; vertical-align:2px}
+  .srow{display:flex; gap:10px; align-items:baseline; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:6px}
+  .srow .stime{flex:none; font-weight:700; font-variant-numeric:tabular-nums; direction:ltr; min-width:108px}
+  .srow .stitle{flex:1; font-weight:600}
+  .srow .stag{flex:none; font-size:11px; font-weight:700; border-radius:999px; padding:2px 8px}
+  .stag.school{background:var(--daniel-soft); color:#1e40af}
+  .stag.tzaharon{background:var(--green-soft); color:#166534}
+  .stag.chug{background:var(--naya-soft); color:#9d174d}
+  .stag.end{background:#f3f4f6; color:var(--muted)}
+  .srow.now{border-color:var(--green); box-shadow:0 0 0 1px var(--green)}
+  .srow .nowtag{color:var(--green); font-size:11px; font-weight:800}
+  .srow.tzbar{background:var(--green-soft); border-color:#bbf7d0; color:#166534; font-weight:700}
+  .srow.brk{background:#fafaf9; border:1px dashed var(--line)}
+  .srow.brk .stitle{color:var(--muted)}
+  .stag.brk{background:#f3f4f6; color:var(--muted)}
+  .sched-note{font-size:12px; color:var(--muted); margin:14px 4px; line-height:1.6}
+  .sharebtn{display:block; width:calc(100% - 8px); margin:10px 4px; padding:11px; border:1.5px solid var(--line); background:#fff; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; color:var(--ink)}
+  .sharebtn:active{background:#f3f4f6}
+
+  /* ---- reminders ---- */
+  .rem-date-row{display:flex; gap:8px; align-items:center; margin:10px 4px}
+  .rem-date-row input[type="date"]{
+    flex:1; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:12px; padding:9px 10px; font-size:15px; font-family:inherit;
+  }
+  .rem-today{flex:none; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer}
+  .rem-form{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px; margin:10px 4px; box-shadow:0 2px 10px rgba(93,64,28,.05);
+  }
+  .rem-form input[type="text"]{
+    width:100%; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:12px; padding:11px 12px; font-size:16px; font-family:inherit; margin-bottom:8px;
+  }
+  .rem-form-row{display:flex; gap:8px}
+  .rem-form-row input[type="time"], .rem-form-row select{
+    flex:1; min-width:0; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:12px; padding:9px 10px; font-size:14px; font-family:inherit;
+  }
+  .rem-add{
+    width:100%; margin-top:10px; border:none; background:var(--accent); color:#fff;
+    border-radius:999px; padding:12px; font-size:15px; font-weight:800; cursor:pointer;
+  }
+  .rem-add:disabled{opacity:.6}
+  .rem-sec{font-size:16px; font-weight:800; margin:18px 4px 6px}
+  .rem-row{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px; margin:0 4px 6px}
+  .rem-row.done{opacity:.6}
+  .rem-row.done .rem-text{text-decoration:line-through}
+  .rem-check{flex:none; width:26px; height:26px; margin-top:1px; cursor:pointer; accent-color:var(--green); transform:scale(1.2)}
+  .rem-main{flex:1; min-width:0}
+  .rem-text{font-weight:700; font-size:15px; line-height:1.4}
+  .rem-meta{font-size:13px; color:var(--muted); margin-top:3px}
+  .rem-del{flex:none; border:none; background:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px}
+  .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
+  /* Family journal */
+  :root{
+    --bg:#f7f5ef; --card:#fffefa; --ink:#253d36; --muted:#566760;
+    --accent:#a3442a; --accent-soft:#f9e7db; --line:#dbdfd4; --radius:14px;
+    --daniel:#335c9b; --naya:#a83d70; --green:#276444;
+  }
+  body{line-height:1.5;overflow-wrap:anywhere}
+  button,input,select{font-family:inherit}
+  :focus-visible{outline:3px solid #247ab0;outline-offset:2px}
+  .wrap{max-width:1020px;padding:16px clamp(14px,4vw,40px) 40px}
+  header{position:relative;isolation:isolate;overflow:hidden;background:#234b40;color:#fff9e9;
+    border-radius:20px;padding:20px 24px;margin:0;min-height:132px;display:flex;align-items:center}
+  .header-copy{z-index:1;max-width:67%}
+  .today-date{font-size:.875rem;color:#dbe7cd}
+  h1{font-size:clamp(1.7rem,4vw,2.8rem);line-height:1.15;letter-spacing:-.04em;margin:5px 0}
+  .sub{color:#f3d2ac;font-size:1rem}
+  .stationery{position:absolute;inset-inline-end:6%;bottom:-10px;width:87px;height:110px;transform:rotate(-13deg)}
+  .stationery i{position:absolute;inset:0;border-radius:5px;background:repeating-linear-gradient(to bottom,transparent 0 13px,#c9c9af 13px 14px),#f0dfba;border-inline-start:9px solid #ce7752;box-shadow:-5px 5px #809d80}
+  .stationery b{position:absolute;left:0;top:-8px;width:9px;height:90px;border-radius:3px;background:linear-gradient(90deg,#df915f 50%,#eeb582 50%);transform:rotate(-17deg)}
+  .stationery b:after{content:"";position:absolute;top:100%;border:4.5px solid transparent;border-top:10px solid #b18862}
+  .syncrow{justify-content:space-between;margin:8px 0}
+  .syncbtn{padding:7px 14px;box-shadow:none}
+  .tabs{margin:0;gap:4px;padding:4px;background:#e7ebe1;border-radius:14px}
+  .tab{background:transparent;border:none;border-radius:10px;min-height:42px}
+  .tab.on{background:#fffefa;color:#244c3d;box-shadow:0 1px 4px #243b3326}
+  .page-heading{font-size:clamp(1.5rem,3vw,2rem);margin:20px 0 10px;letter-spacing:-.035em}
+  .weeknav,.rem-form{box-shadow:none;margin-inline:0;padding:14px}
+  .weeklabel .wname{font-size:1rem}
+  .archive{border-top:1px solid var(--line);margin-top:10px;padding-top:6px}
+  .archive summary{font-size:.875rem;cursor:pointer;color:var(--muted);width:fit-content}
+  .weekchips,.daychips{flex-wrap:wrap}
+  .filters{margin:8px 0;gap:5px}
+  .chip{font-weight:600;padding:6px 13px}
+  #statusFilters .chip{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--muted)}
+  #statusFilters .chip.on{color:var(--accent);border-color:var(--accent)}
+  #childFilters .chip.on{background:#294e43;border-color:#294e43}
+  #childFilters .daniel.on{background:var(--daniel)}
+  #childFilters .naya.on{background:var(--naya)}
+  .child{min-width:0;margin-top:16px}
+  .child-head{align-items:center;padding:0 2px 10px;line-height:1.25}
+  .ring{--color:var(--daniel);width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--color) var(--progress),#dfe4da 0)}
+  .ring.naya{--color:var(--naya)}
+  .ring b{background:var(--bg);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;color:var(--color);font-size:.8rem;direction:ltr}
+  .card{box-shadow:0 3px 10px #344d3508;border-radius:14px}
+  .title{flex-basis:100%;min-width:0}
+  .duepill{font-size:.8125rem;white-space:normal;padding:3px 9px}
+  .duepill.today{background:#f9e0c6;color:#883e16}
+  .details-btn{color:var(--muted);text-align:start}
+  .check,.rem-check{width:23px;height:23px;transform:none;margin-inline:0}
+  .empty,.rem-empty{background:#edf2e8;border:1px dashed #a9bba5;color:#37513e;padding:24px 12px}
+  .updated,.sources{color:var(--muted);font-size:.8rem;font-weight:normal}
+  .daychips{margin-inline:0;padding:0}
+  .sharebtn{width:auto;margin-inline:0;padding:7px 14px}
+  #schedApp .child{padding:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius)}
+  .srow{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;
+    border:none;border-inline-start:2px solid #b8cbbb;border-radius:0;margin:0 6px 0 0;padding:9px 17px 9px 8px}
+  .srow:before{content:"";position:absolute;inset-inline-start:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:#5d816e}
+  .srow .stime{grid-column:1;grid-row:1;justify-self:start;font-size:.82rem;color:var(--muted);min-width:0}
+  .srow .stitle{grid-column:1;grid-row:2}
+  .srow .stag{grid-column:2;grid-row:2}
+  .srow .nowtag{grid-column:2;grid-row:1}
+  .srow.brk{background:#f7f2e6;border:0;border-inline-start:2px dashed #ac9c7e}
+  .srow.brk:before{background:#a99066}
+  .srow.now{border-radius:6px;background:#e1efdf}
+  .form-title{display:block;font-size:1.1rem;font-weight:700;margin-bottom:10px}
+  .rem-add{border-radius:10px}
+  .rem-date-row input{min-width:0}
+  footer{border-top:1px solid var(--line);padding-top:18px}
+  @media(min-width:750px){
+    header{padding:24px 32px}
+    .stationery{transform:rotate(-13deg) scale(1.3);inset-inline-end:9%}
+    #remindersView{display:flow-root}
+    .rem-form{float:inline-end;width:40%;margin:12px 0 24px}
+    #remApp{width:57%}
+    #remindersView>.sched-note{clear:both}
+  }
+  :root{--bg:#faf8f6;--card:#fff;--ink:#2c203c;--muted:#655d70;--accent:#583790;--accent-soft:#f0e9ff;--line:#ded9e2;--daniel:#304d98;--naya:#973858;--green:#23715a}
+  .wrap{max-width:960px;padding:0 16px 110px}
+  header{min-height:0;border-radius:0;background:transparent;color:var(--ink);padding:18px 0 12px;gap:10px;border-bottom:1px solid var(--line)}
+  .header-copy{max-width:none;display:flex;flex-direction:column-reverse}
+  .brandmark{display:grid;place-items:center;width:44px;height:44px;background:#493063;color:#ffcd9c;border-radius:15px;font:38px/1 Arial}
+  h1{font-size:1.25rem;letter-spacing:-.025em;margin:0}
+  .today-date{color:var(--muted);font-size:.8125rem}
+  .syncrow{justify-content:flex-end;margin:3px 0}
+  .syncstatus{font-size:.75rem}
+  .syncbtn{background:transparent;border:none;min-height:44px;padding:5px;color:var(--accent)}
+  .page-heading{margin:4px 0 14px;font-size:clamp(1.9rem,5vw,2.65rem);line-height:1.1}
+  .overview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kid-summary{position:relative;overflow:hidden;isolation:isolate;text-align:start;border:2px solid transparent;color:#253864;background:#e1e9ff;border-radius:22px;padding:14px;cursor:pointer}
+  .kid-summary.naya{background:#ffdfde;color:#712d46}
+  .kid-summary:after{content:"";z-index:-1;position:absolute;inset-inline-end:-26px;top:-26px;width:88px;height:88px;border:11px double currentColor;border-radius:50%;opacity:.09}
+  .kid-summary[aria-pressed=true]{border-color:currentColor}
+  .kid-name{display:flex;align-items:center;gap:7px;font-size:1.04rem;font-weight:750}
+  .kid-name i{display:grid;place-items:center;border-radius:50%;background:#fff9;width:26px;height:26px;font-style:normal}
+  .kid-total{display:block;margin:7px 0 8px;font-size:.93rem}
+  .kid-total strong{font-size:2.3rem;line-height:1;font-variant-numeric:tabular-nums}
+  .meter{display:block;height:6px;border-radius:10px;background:#fff9;overflow:hidden}
+  .meter i{display:block;height:100%;background:currentColor;border-radius:inherit}
+  .kid-summary small{display:block;margin-top:5px}
+  .weeknav{background:transparent;border:0;padding:0;margin:14px 0 2px}
+  .weeknav-row{gap:2px}.weeklabel{text-align:start}.weeklabel .wname{font-size:1rem}
+  .weeknav .navbtn{width:44px;height:44px;border:none;background:transparent}
+  .archive{margin:0;padding:0;border:0}.archive summary{padding:10px 4px;min-height:44px}
+  .weekstats{margin:0 4px 10px}.filters{gap:0}
+  #statusFilters{display:flex;background:#ede9ef;border-radius:15px;padding:4px;width:100%}
+  #statusFilters .chip{flex:1;min-height:44px;border:none;border-radius:11px}
+  #statusFilters .chip.on{background:white;box-shadow:0 2px 5px #382d4815;color:var(--ink)}
+  .child-head{padding:4px 4px 10px;gap:8px}.child-head h2{font-size:1.08rem}
+  .count{border-radius:99px;padding:2px 8px;background:#ece8ef;font-weight:700}
+  .dot{width:9px;height:9px}
+  .card,.rem-row,.rem-form,#schedApp .child{border:1px solid #e6e0e8;border-radius:20px;box-shadow:0 4px 14px #39244708}
+  .card{padding:12px 12px 0}.card-top{gap:8px}
+  .check,.rem-check{appearance:none;display:grid;place-items:center;transform:none;margin:0;width:44px;height:44px;border:none;background:transparent;position:relative;cursor:pointer}
+  :is(.check,.rem-check)::before,:is(.check,.rem-check)::after{content:"";grid-area:1/1}
+  :is(.check,.rem-check)::before{width:26px;height:26px;box-sizing:border-box;border:2px solid #8a7d99;border-radius:50%;background:#fff;transition:background .15s,border-color .15s}
+  :is(.check,.rem-check)::after{width:11px;height:6px;border:solid white;border-width:0 0 2.6px 2.6px;transform:translateY(-1px) rotate(-45deg) scale(0);transition:transform .18s}
+  :is(.check,.rem-check):checked::before{background:var(--green);border-color:var(--green);animation:check-pop .24s ease-out}
+  :is(.check,.rem-check):checked::after{transform:translateY(-1px) rotate(-45deg) scale(1)}
+  @keyframes check-pop{45%{transform:scale(1.14);box-shadow:0 0 0 4px #23806422}}
+  .card.done,.rem-row.done{opacity:1;background:#f3f7f4}
+  .card-main{padding-top:6px}
+  .details-btn{display:flex;align-items:center;justify-content:space-between;color:var(--accent);min-height:44px;padding:9px 5px}
+  .details-btn:after{content:"";width:8px;height:8px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg);transition:transform .2s}
+  .details-btn[aria-expanded=true]:after{transform:rotate(225deg)}
+  .details,.details.open{display:grid;padding:0;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .22s ease,opacity .2s}
+  .details.open{grid-template-rows:1fr;opacity:1}
+  .details-body{overflow:hidden;min-height:0}.details.open .details-body{margin-bottom:10px}
+  .duepill.overdue{background:#ffe3e5;color:#892d44}.duepill.today{background:#ffebcb;color:#75420b}
+  .empty,.rem-empty{background:#f2edf8;color:#533e67;border-color:#bdb1cb}
+  .tabs{position:fixed;z-index:4;bottom:max(8px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(calc(100% - 24px),470px);margin:0;padding:6px;background:#30233f;border-radius:22px;box-shadow:0 6px 22px #30233f38}
+  .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:51px;color:#f5eefc;border-radius:16px;font-size:.8125rem}
+  .tab svg{width:20px;height:20px}.tab.on{background:#f1e5ff;color:#452766}
+  html{scroll-padding-bottom:105px}
+  .dchip,.wchip,.rem-today,.rem-del,.sharebtn,.links a{min-height:44px}
+  .daychips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .dchip{padding:4px;border-radius:12px}.dchip.today{border-color:var(--accent)}
+  .srow{border-inline-start-color:#b9a9d1}.srow::before{background:#755797}
+  .srow.brk{background:#fff1db;border-inline-start-color:#b18d58}
+  .srow.now{background:#e0f3ed;border-color:var(--green)}
+  .rem-add{background:#51366f;min-height:46px;border-radius:14px}
+  .rem-form-row select,.rem-form-row input,.rem-date-row input{min-height:44px;font-size:16px!important}
+  .rem-del{min-width:44px}.links a{display:inline-flex;align-items:center}
+  @media(min-width:750px){
+    .wrap{padding:0 32px 48px}header{padding:22px 0 16px}
+    .tabs{position:static;transform:none;width:fit-content;min-width:420px;margin:0 0 18px}
+    .tab{flex-direction:row;gap:8px;min-height:44px}.overview{gap:16px}
+    .kid-summary{padding:18px 22px}.kid-total strong{font-size:2.8rem}
+    #statusFilters{max-width:420px}.daychips{grid-template-columns:repeat(6,minmax(0,1fr))}
+  }
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+  @media(forced-colors:active){.check,.rem-check{appearance:auto}.check::before,.check::after,.rem-check::before,.rem-check::after{display:none}}
+  #schedApp{display:block}
+  .family-schedule{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .family-schedule caption{text-align:start;padding:10px 2px;font-size:1.15rem;font-weight:750}
+  .family-schedule .time-col{width:clamp(64px,19%,132px)}
+  .family-schedule th,.family-schedule td{padding:9px 8px;text-align:start;vertical-align:middle}
+  .family-schedule thead th{background:#ede9ef;font-size:1rem}
+  .family-schedule thead .daniel{background:#e1e9ff;color:#253864}
+  .family-schedule thead .naya{background:#ffdfde;color:#712d46}
+  .family-schedule tbody :is(th,td){border-top:1px solid var(--line)}
+  .family-schedule td{border-inline-start:1px solid var(--line);line-height:1.35}
+  .family-schedule tbody th{background:#f6f3f7;color:var(--muted);font-size:.875rem;font-variant-numeric:tabular-nums}
+  .family-schedule bdi{direction:ltr;display:inline-block;overflow-wrap:normal}
+  .slot{display:block;font-weight:650}
+  .slot small,.school-end,.now-label{display:block;font-size:.78rem}
+  .slot:is(.break,.care,.club){border-radius:8px;padding:5px 7px}
+  .slot.break{color:#75420b;background:#fff0d5}
+  .slot.care{color:#255d49;background:#e7f5ec}
+  .slot.club{color:#52366f;background:#f1eafa}
+  .school-end{color:var(--muted);margin-top:4px}
+  .family-schedule th bdi,.family-schedule .slot{white-space:nowrap}
+  .slot-info summary{cursor:pointer;display:flex;align-items:center;gap:3px;list-style:none}
+  .slot-info summary::-webkit-details-marker{display:none}
+  .slot-info summary::after{content:"⌄";font-size:.78rem;color:var(--muted)}
+  .slot-info[open] summary::after{transform:rotate(180deg)}
+  .slot-info>small{display:block;margin-top:3px;color:var(--muted)}
+  .current-slot{outline:2px solid var(--green);outline-offset:-2px}
+  .now-label{color:var(--green)}
+  @media(max-width:749px){
+    .wrap{padding-inline:12px}
+    .kid-summary{padding:10px 12px;border-radius:16px}
+    .kid-total{margin:4px 0}.kid-total strong{font-size:1.65rem}
+    .weeknav{margin-top:6px}
+    .weeknav:not(:has(.archive[open])){display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+    .weeknav[style*="none"]{display:none!important}
+    .card{padding-top:6px}.card .tags{margin-top:3px}
+    .card .details-btn{margin-top:2px}
+    .child{margin-top:10px}
+    .syncrow{min-height:0;margin:0}
+    .family-schedule .slot small{display:inline;margin-inline-end:3px}
+    .family-schedule .slot small::after{content:" ·"}
+
+    .daychips{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin:4px 0}
+    .dchip{white-space:normal;font-size:.85rem;line-height:1.15;padding:3px 1px;min-width:0}
+    .family-schedule caption{padding:5px 2px;font-size:1rem}
+    .family-schedule .time-col{width:5.6rem}
+    .family-schedule th,.family-schedule td{padding:3px 5px}
+    .family-schedule tbody th{font-size:.8125rem}
+    .family-schedule .slot-info summary{gap:1px;letter-spacing:-.012em}
+    .family-schedule td{font-size:.875rem;line-height:1.35}
+    .slot:is(.break,.care,.club){padding:3px 4px}
+    .school-end{margin-top:1px}
+    .school-end,.slot small{font-size:.75rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="brandmark" aria-hidden="true">✳</span><div class="header-copy">
+      <div class="today-date" id="todayDate"></div>
+      <h1>היומן המשפחתי</h1>
+
+    </div>
+
+  </header>
+  <div class="syncrow">
+    <span class="syncstatus" id="syncStatus" role="status"></span>
+    <button class="syncbtn" id="syncBtn">↻ סנכרן</button>
+    <button class="syncbtn" id="designToggle">↩ עיצוב קלאסי</button>
+  </div>
+  <nav class="tabs" aria-label="תצוגת היומן">
+    <button class="tab on" aria-pressed="true" data-tab="homework"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></svg>שיעורי בית</button>
+    <button class="tab" data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5h3"/></svg>מערכת שעות</button>
+    <button class="tab" data-tab="reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4l-2 4Zm5 3a2 2 0 0 0 4 0"/></svg>תזכורות</button>
+  </nav>
+
+  <div class="err" id="err">לא הצלחתי לטעון את המשימות — נסו לרענן את הדף.</div>
+
+  <div id="homeworkView">
+    <h2 class="page-heading">שיעורי הבית</h2>
+    <div class="overview" id="overview" aria-label="התקדמות שבועית וסינון לפי ילד"></div>
+  <div class="weeknav" id="weeknav" style="display:none">
+    <div class="weeknav-row">
+      <button class="navbtn" id="prevWeek" aria-label="שבוע קודם">›</button>
+      <div class="weeklabel">
+        <span class="wname" id="weekName"></span><span class="wtag" id="weekTag"></span>
+      </div>
+      <button class="navbtn" id="nextWeek" aria-label="שבוע הבא">‹</button>
+    </div>
+    <details class="archive"><summary>בחירת שבוע</summary><div class="weekchips" id="weekChips"></div></details>
+  </div>
+  <div class="weekstats" id="weekStats"></div>
+
+  <div class="filters" id="statusFilters">
+    <button class="chip" data-status="all">הכל</button>
+    <button class="chip on" data-status="open">פתוחות</button>
+    <button class="chip" data-status="done">בוצעו</button>
+  </div>
+
+
+  <div id="app"><div class="empty" role="status">טוען משימות…</div></div>
+    <div class="updated" id="lastUpdated"></div>
+    <div class="sources" id="sourcePulls"></div>
+
+
+  </div>
+
+  <div id="scheduleView" style="display:none">
+    <h2 class="page-heading">מערכת השעות</h2>
+    <div class="daychips" id="dayChips"></div>
+    <div id="schedApp"></div>
+    <button class="sharebtn" id="shareSched">🔗 העתק קישור ליום הזה</button>
+    <div class="sched-note">שעות השיעורים של נאיה לפי פעמוני בית הספר (כמו ג׳3) — אושרו התחלה 8:00 וסיום 12:45, שישי 11:40. מקורות: מערכת ג׳3 (ליאור, 11/9) · מערכת א׳2 (מורן, 4/11) · מערכת חוגים א2 (17/11) · יומן חוגים.</div>
+  </div>
+
+  <div id="remindersView" style="display:none">
+    <h2 class="page-heading">תזכורות משפחתיות</h2>
+    <div class="rem-date-row">
+      <input type="date" id="remDate" aria-label="תאריך">
+      <button class="rem-today" id="remToday">היום</button>
+    </div>
+    <div class="rem-form">
+      <label class="form-title" for="remText">תזכורת חדשה</label>
+      <input type="text" id="remText" placeholder="מה להזכיר? למשל: להביא חולצת ספורט" maxlength="200">
+      <div class="rem-form-row">
+        <input type="time" id="remTime" aria-label="שעה">
+        <select id="remChild" aria-label="למי">
+          <option value="all">שני הילדים</option>
+          <option value="daniel">🔵 דניאל</option>
+          <option value="naya">🩷 נאיה</option>
+        </select>
+      </div>
+      <button class="rem-add" id="remAdd">＋ הוסף תזכורת</button>
+    </div>
+    <div id="remApp"></div>
+    <div class="sched-note">התזכורות נשמרות באתר ומשותפות לשניכם — מה שאחד מוסיף, השני רואה. הן לא נכנסות לגיליון שיעורי הבית.</div>
+  </div>
+
+  <footer>
+    מקור המשימות: גיליון שיעורי הבית • הסימונים נשמרים ומסונכרנים בין כולם<br>
+    מערכת שעות: מערכות בית הספר והחוגים כפי שנמסרו • נבנה לשימוש המשפחה
+  </footer>
+</div>
+
+<script>
+document.getElementById("todayDate").textContent = new Intl.DateTimeFormat("he-IL", {
+  weekday: "long", day: "numeric", month: "long"
+}).format(new Date());
+const KIDS = {
+  daniel: { name: "דניאל", emoji: "🔵", cls: "daniel" },
+  naya:   { name: "נאיה",  emoji: "🩷", cls: "naya" }
+};
+let WEEKS = { weeks: [], current: "" };
+let DATA = { week: "", updated: "", tasks: [] };
+let viewWeek = "";
+let statusFilter = "open";
+let childFilter = "all";
+
+/* ---- reminders (shared, stored in KV via /api/reminders) ---- */
+let REMINDERS = [];
+let remDate = ""; // set to today on first render (todayISO is defined below)
+let lastLoadAt = 0;
+
+/* ---- weekly timetable (static reference data, updated 17/11/2026) ----
+   Sources: Daniel g3 PDF (Lior, 11/9) · Naya a2 PDF (Moran, 4/11) ·
+   A2 chugim photo (17/11) · Google "חוגים" calendar.
+   Confirmed by Oren 17/11: school starts 08:00 for both; Daniel has no
+   tzaharon; Naya ends school 12:45 (Fri 11:40) and goes straight to
+   tzaharon until 16:30, chugim during it. Naya's lesson times follow the
+   school bells (same as g3) — only start/end are confirmed. */
+const SCHEDULE = { days: [
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","מדעים"],["08:50–09:35","חינוך גופני"],["10:10–10:55","מתמטיקה"],["10:55–11:40","עברית"],["12:00–12:45","מולדת"]],
+      tzchug: [], extra: [["16:00–17:00","אנגלית"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","שפה"],["10:10–10:55","חינוך גופני"],["10:55–11:40","חשבון"],["12:00–12:45","ספרייה / גאומטריה"]],
+      tzchug: [["13:30–14:30","תכשיטנות (גלי אדלשטיין)"]], extra: [] } },
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","אנגלית"],["08:50–09:35","אנגלית"],["10:10–10:55","עברית"],["10:55–11:40","גאומטריה"],["12:00–12:45","עברית"]],
+      tzchug: [], extra: [["16:45–17:30","שחייה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","אנגלית"],["10:10–10:55","חינוך גופני"],["10:55–11:40","חשבון"],["12:00–12:45","חשבון"]],
+      tzchug: [["15:00–16:30","אומנות משולבת (שרה)"]], extra: [["17:45–18:30","התעמלות קרקע"]] } },
+  { daniel: { end: "13:30", tzaharon: null,
+      school: [["08:00–08:50","מתמטיקה"],["08:50–09:35","מתמטיקה"],["10:10–10:55","לשון"],["10:55–11:40","אמנות"],["12:00–12:45","מדעים"],["12:45–13:30","חינוך גופני"]],
+      tzchug: [], extra: [["15:00–16:00","שיעור פרטי חשבון"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","אומנות"],["08:50–09:35","ספורט בזמר"],["10:10–10:55","מוסיקה"],["10:55–11:40","זהירות בדרכים"],["12:00–12:45","מדעים"]],
+      tzchug: [["14:15–15:00","קוסמות (גאיה סלם)"]], extra: [] } },
+  { daniel: { end: "12:45", tzaharon: null,
+      school: [["08:00–08:50","עברית / כלבנות"],["08:50–09:35","עברית / כלבנות"],["10:10–10:55","מדעים"],["10:55–11:40","אנגלית"],["12:00–12:45","אנגלית מדוברת"]],
+      tzchug: [], extra: [["16:45–17:30","שחייה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","חשבון"],["08:50–09:35","שפה"],["10:10–10:55","חשבון"],["10:55–11:40","כישורי חיים"],["12:00–12:45","מדעים"]],
+      tzchug: [["13:30–14:15","וטרינריה (יובל כהן)"]], extra: [["16:30–17:30","שחייה (עם בן)"]] } },
+  { daniel: { end: "13:30", tzaharon: null,
+      school: [["08:00–08:50","מתמטיקה"],["08:50–09:35","מתמטיקה"],["10:10–10:55","מולדת"],["10:55–11:40","תנ״ך"],["12:00–12:45","מפתח הלב"],["12:45–13:30","עברית"]],
+      tzchug: [], extra: [["16:25–17:25","נינג׳ה"]] },
+    naya: { end: "12:45", tzaharon: "12:45–16:30",
+      school: [["08:00–08:50","שפה"],["08:50–09:35","שפה"],["10:10–10:55","חשבון"],["10:55–11:40","שפה / יוגה"],["12:00–12:45","שפה / יוגה"]],
+      tzchug: [], extra: [["17:45–18:30","התעמלות קרקע"]] } },
+  { daniel: { end: "11:40", tzaharon: null,
+      school: [["08:00–08:50","תלמיד מלמד"],["08:50–09:35","מתמטיקה"],["10:10–10:55","תנ״ך"],["10:55–11:40","כישורי חיים"]],
+      tzchug: [], extra: [] },
+    naya: { end: "11:40", tzaharon: null,
+      school: [["08:00–08:50","תלמיד מלמד"],["08:50–09:35","חשבון"],["10:10–10:55","מפתח הלב"],["10:55–11:40","בעקבות סיפורים"]],
+      tzchug: [], extra: [] } },
+]};
+
+let activeTab = "homework";
+let schedDay = (() => { const d = new Date().getDay(); return (d >= 0 && d <= 5) ? d : 0; })();
+
+function rangeMinutes(t){
+  const m = t.match(/^(\d{1,2}):(\d{2})–(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  return [+m[1] * 60 + +m[2], +m[3] * 60 + +m[4]];
+}
+
+function fmtMin(m){
+  return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+}
+
+function scheduleEvents(day){
+  const events = [];
+  function add(time, title, kind){
+    const [start, end] = rangeMinutes(time);
+    events.push({start, end, title, kind});
+  }
+  let previousEnd;
+  for(const [time, title] of day.school){
+    const [start, end] = rangeMinutes(time);
+    if(previousEnd !== undefined && start - previousEnd > 5){
+      events.push({start:previousEnd, end:start, kind:"break", title:"הפסקה · " + (start - previousEnd) + " דקות"});
+    }
+    add(time, title, "lesson");
+    previousEnd = end;
+  }
+  if(day.tzaharon) add(day.tzaharon, "צהרון", "care");
+  for(const [time, title] of day.tzchug) add(time, title, "club");
+  for(const [time, title] of day.extra) add(time, title, "club");
+  return events;
+}
+
+function scheduleCell(events, day, start, end){
+  const active = events.filter(event => event.start <= start && event.end >= end);
+  const inCare = active.some(event => event.kind === "care");
+  const labels = active.filter(event => event.kind !== "care" || active.length === 1).map(event => {
+    const prefix = event.kind === "club" ? (inCare ? "חוג צהרון" : "חוג") : "";
+    const endsSchool = event.kind === "lesson" && fmtMin(end) === day.end;
+    if(prefix || endsSchool){
+      const summary = event.title.replace(/\s*\([^)]*\)$/, "").replace(/ \/ /g, "/")
+        .replace("שיעור פרטי חשבון", "חשבון פרטי");
+      const detail = prefix ? prefix + " · " + event.title : "סיום הלימודים " + day.end;
+      return '<details class="slot-info"><summary class="slot ' + event.kind + '">' +
+        esc(summary) + '</summary><small>' + esc(detail) + '</small></details>';
+    }
+    return '<span class="slot ' + event.kind + '">' + esc(event.title) + '</span>';
+  });
+  return '<td>' + (labels.join("") || '<span aria-label="אין פעילות">—</span>') + '</td>';
+}
+
+function renderSchedule(){
+  const today = new Date().getDay();
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const isToday = schedDay === today;
+  const chips = document.getElementById("dayChips");
+  chips.innerHTML = [0,1,2,3,4,5].map(d =>
+    '<button class="dchip' + (d === schedDay ? " on" : "") + (d === today ? " today" : "")
+    + '" data-day="' + d + '">' + HEB_DAYS[d] + (d === today ? " · היום" : "") + "</button>").join("");
+  chips.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
+    schedDay = +b.dataset.day;
+    try{ history.replaceState(null, "", "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "")); }catch(e){}
+    renderSchedule();
+  }));
+
+  const day = SCHEDULE.days[schedDay];
+  const keys = ["daniel","naya"];
+  const events = keys.map(key => scheduleEvents(day[key]));
+  const times = [...new Set(events.flat().flatMap(event => [event.start, event.end]))].sort((a,b) => a-b);
+  const rows = [];
+  for(let i = 0; i < times.length - 1; i++){
+    const start = times[i], end = times[i + 1];
+    const now = isToday && nowMin >= start && nowMin < end;
+    rows.push('<tr' + (now ? ' class="current-slot"' : '') + '><th scope="row"><bdi>' +
+      fmtMin(start) + '–' + fmtMin(end) + '</bdi>' +
+      (now ? '<small class="now-label">עכשיו</small>' : '') + '</th>' +
+      keys.map((key, index) => scheduleCell(events[index], day[key], start, end)).join("") + '</tr>');
+  }
+  document.getElementById("schedApp").innerHTML = '<table class="family-schedule"><caption>יום ' +
+    HEB_DAYS[schedDay] + (isToday ? ' · היום' : '') + '</caption><colgroup><col class="time-col"><col><col></colgroup>' +
+    '<thead><tr><th scope="col">שעה</th><th scope="col" class="daniel">דניאל</th>' +
+    '<th scope="col" class="naya">נאיה</th></tr></thead><tbody>' + rows.join("") + '</tbody></table>';
+}
+
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(b => {
+    b.classList.toggle("on", b.dataset.tab === tab);
+    b.setAttribute("aria-pressed", String(b.dataset.tab === tab));
+  });
+  document.getElementById("homeworkView").style.display = tab === "homework" ? "block" : "none";
+  document.getElementById("scheduleView").style.display = tab === "schedule" ? "block" : "none";
+  document.getElementById("remindersView").style.display = tab === "reminders" ? "block" : "none";
+  if(tab === "schedule") renderSchedule();
+  if(tab === "reminders") renderReminders();
+  try{
+    const h = tab === "homework" ? "#homework"
+      : tab === "reminders" ? "#reminders"
+      : "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "");
+    history.replaceState(null, "", h);
+  }catch(e){}
+}
+
+/* ---- reminders tab ---- */
+function remSort(list){
+  return list.slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const ta = a.time || "99:99", tb = b.time || "99:99";
+    if(ta !== tb) return ta < tb ? -1 : 1;
+    return (a.created || "") < (b.created || "") ? -1 : 1;
+  });
+}
+
+function remRow(r){
+  const kid = r.child && KIDS[r.child] ? KIDS[r.child].emoji + " " + KIDS[r.child].name : "שני הילדים";
+  const meta = [r.time ? "🕐 " + esc(r.time) : "", kid].filter(Boolean).join(" · ");
+  return '<div class="rem-row' + (r.done ? " done" : "") + '">'
+    + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
+    + '<div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + "</div>"
+    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div>';
+}
+
+function renderReminders(){
+  if(!remDate) remDate = todayISO();
+  const dateInput = document.getElementById("remDate");
+  if(dateInput && dateInput.value !== remDate) dateInput.value = remDate;
+  const isToday = remDate === todayISO();
+  const d = new Date(remDate + "T12:00:00");
+  const dayLabel = isToday ? "היום" : "יום " + HEB_DAYS[d.getDay()];
+  let html = '<div class="sched-day">' + dayLabel + " · " + shortDate(remDate)
+    + (isToday ? '<span class="today-tag">היום</span>' : "") + "</div>";
+
+  // Overdue undone reminders (only when looking at today).
+  const overdue = isToday ? REMINDERS.filter(r => !r.done && r.date < remDate) : [];
+  if(overdue.length){
+    html += '<div class="rem-sec">⏰ שעבר זמנן</div>';
+    html += remSort(overdue).map(remRow).join("");
+  }
+
+  const list = REMINDERS.filter(r => r.date === remDate);
+  html += '<div class="rem-sec">🔔 תזכורות ליום הזה</div>';
+  html += list.length ? remSort(list).map(remRow).join("")
+    : '<div class="rem-empty">אין תזכורות ליום הזה — הוסיפו אחת למעלה 🙂</div>';
+
+  // Homework tasks due on this day (from the sheet, read-only here).
+  const due = DATA.tasks.filter(t => t.due_iso === remDate && !t.done);
+  if(due.length){
+    html += '<div class="rem-sec">📚 מטלות שצריכות להסתיים ' + (isToday ? "היום" : "ביום הזה") + "</div>";
+    html += due.map(t => {
+      const kid = KIDS[t.child] || {};
+      return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(t.short || t.title) + "</div>"
+        + '<div class="rem-meta">' + (kid.emoji || "") + " " + (kid.name || "") + (t.subject ? " · " + esc(t.subject) : "") + "</div></div></div>";
+    }).join("");
+  }
+  document.getElementById("remApp").innerHTML = html;
+
+  document.querySelectorAll("#remApp .rem-check").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = cb.dataset.id, done = cb.checked;
+      cb.closest(".rem-row").classList.toggle("done", done);
+      try{
+        await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/done", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({done})
+        }, 3);
+        const r = REMINDERS.find(x => x.id === id);
+        if(r) r.done = done;
+        renderReminders();
+      }catch(e){
+        cb.checked = !done;
+        cb.closest(".rem-row").classList.toggle("done", !done);
+        alert("הסימון לא נשמר — נסו שוב.");
+      }
+    });
+  });
+  document.querySelectorAll("#remApp .rem-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if(!confirm("למחוק את התזכורת?")) return;
+      try{
+        await fetchJSON("/api/reminders/" + encodeURIComponent(id), {method: "DELETE"}, 3);
+        REMINDERS = REMINDERS.filter(x => x.id !== id);
+        renderReminders();
+      }catch(e){ alert("המחיקה נכשלה — נסו שוב."); }
+    });
+  });
+}
+
+async function loadReminders(){
+  try{
+    const data = await fetchJSON("/api/reminders", null, 3);
+    REMINDERS = data.reminders || [];
+    if(activeTab === "reminders") renderReminders();
+  }catch(e){ /* reminders stay as-is; the tab shows the empty state */ }
+}
+
+async function addReminder(){
+  const textEl = document.getElementById("remText");
+  const text = (textEl.value || "").trim();
+  if(!text){ textEl.focus(); return; }
+  const btn = document.getElementById("remAdd");
+  btn.disabled = true;
+  try{
+    const created = await fetchJSON("/api/reminders", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text,
+        date: remDate || todayISO(),
+        time: document.getElementById("remTime").value || "",
+        child: document.getElementById("remChild").value || "all"
+      })
+    }, 3);
+    if(created.reminder) REMINDERS.push(created.reminder);
+    textEl.value = "";
+    document.getElementById("remTime").value = "";
+    renderReminders();
+  }catch(e){ alert("התזכורת לא נשמרה — נסו שוב."); }
+  btn.disabled = false;
+}
+
+/* ---- sync: reload the site's data from the server ---- */
+function setSyncStatus(msg){ document.getElementById("syncStatus").textContent = msg; }
+
+async function syncNow(){
+  const btn = document.getElementById("syncBtn");
+  btn.disabled = true;
+  btn.textContent = "מסנכרן…";
+  try{
+    WEEKS = await fetchJSON("/api/weeks");
+    if(viewWeek) await loadWeek(viewWeek);
+    else { DATA = await fetchJSON("/api/tasks"); render(); }
+    await loadReminders();
+    lastLoadAt = Date.now();
+    const now = new Date();
+    setSyncStatus("✅ סונכרן " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
+      + (DATA.updated ? " · נתוני הגיליון מ־" + formatUpdated(DATA.updated) : ""));
+  }catch(e){
+    setSyncStatus("⚠️ הסנכרון נכשל — נסו שוב");
+  }
+  btn.textContent = "↻ סנכרן";
+  btn.disabled = false;
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isoOf = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+const todayISO = () => isoOf(new Date());
+const tomorrowISO = () => { const d = new Date(); d.setDate(d.getDate()+1); return isoOf(d); };
+const HEB_DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+
+function dayName(iso){
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return "";
+  return HEB_DAYS[new Date(+m[1], +m[2]-1, +m[3]).getDay()];
+}
+function shortDate(iso){
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (+m[3]) + "/" + (+m[2]) : "";
+}
+
+function formatUpdated(u){
+  if(!u) return "";
+  const dateOnly = u.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(dateOnly) return (+dateOnly[3]) + "/" + (+dateOnly[2]) + "/" + dateOnly[1];
+  const d = new Date(u);
+  if(isNaN(d)) return u;
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  return d.getDate() + "/" + (d.getMonth()+1) + "/" + d.getFullYear() + ", " + hh + ":" + mm;
+}
+
+function duePill(t){
+  if(t.done) return '<span class="duepill">✅ בוצע</span>';
+  if(!t.due_iso){
+    if(t.due && t.due !== "לא צוין") return '<span class="duepill">' + esc(t.due) + "</span>";
+    return '<span class="duepill">ללא תאריך</span>';
+  }
+  if(t.due_iso === todayISO()) return '<span class="duepill today">להיום · ' + shortDate(t.due_iso) + "</span>";
+  if(t.due_iso === tomorrowISO()) return '<span class="duepill tomorrow">למחר · ' + shortDate(t.due_iso) + "</span>";
+  if(t.due_iso < todayISO()) return '<span class="duepill overdue">באיחור · ' + shortDate(t.due_iso) + "</span>";
+  return '<span class="duepill future">עד ' + dayName(t.due_iso) + " " + shortDate(t.due_iso) + "</span>";
+}
+
+function givenPill(t){
+  if(!t.given_iso) return "";
+  return '<span class="duepill given">ניתנה ' + shortDate(t.given_iso) + "</span>";
+}
+
+function weekShort(w){ return w.replace(/^שבוע\s*/, ""); }
+
+function renderWeekNav(){
+  const nav = document.getElementById("weeknav");
+  if(!WEEKS.weeks.length){ nav.style.display = "none"; return; }
+  nav.style.display = "block";
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  const isCurrent = viewWeek === WEEKS.current;
+  document.getElementById("weekName").textContent = viewWeek;
+  const tag = document.getElementById("weekTag");
+  tag.textContent = isCurrent ? "השבוע" : "שבוע קודם";
+  tag.className = "wtag" + (isCurrent ? "" : " old");
+  document.getElementById("prevWeek").disabled = idx <= 0;
+  document.getElementById("nextWeek").disabled = idx < 0 || idx >= WEEKS.weeks.length - 1;
+
+  const chips = document.getElementById("weekChips");
+  chips.innerHTML = WEEKS.weeks.map(w =>
+    '<button class="wchip' + (w === viewWeek ? " on" : "") + '" data-week="' + esc(w) + '">'
+    + esc(weekShort(w)) + (w === WEEKS.current ? " · השבוע" : "") + "</button>").join("");
+  chips.querySelectorAll(".wchip").forEach(b => {
+    b.addEventListener("click", () => loadWeek(b.dataset.week));
+  });
+
+  const total = DATA.tasks.length;
+  const nw = DATA.tasks.filter(t => t.is_new).length;
+  const nc = DATA.tasks.filter(t => t.carried).length;
+  const nd = DATA.tasks.filter(t => t.done).length;
+  document.getElementById("weekStats").innerHTML =
+    (total ? "<span><b>" + total + "</b> משימות</span>" : "")
+    + (nw ? '<span class="st-new">✨ ' + nw + " חדשות</span>" : "")
+    + (nc ? '<span class="st-carried">🔁 ' + nc + " נגררו משבוע שעבר</span>" : "")
+    + "<span>✅ <b>" + nd + "</b> בוצעו</span>";
+}
+
+function sortTasks(list){
+  // Open first, by due date (earliest first, no date last); done last,
+  // also by due date. Stable for equal keys (sheet order kept).
+  return list.slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const da = a.due_iso || "9999-99-99";
+    const db = b.due_iso || "9999-99-99";
+    if(da !== db) return da < db ? -1 : 1;
+    return 0;
+  });
+}
+
+function render(){
+  renderWeekNav();
+  document.getElementById("overview").innerHTML = Object.entries(KIDS).map(([key, kid]) => {
+    const tasks = DATA.tasks.filter(t => t.child === key);
+    const done = tasks.filter(t => t.done).length;
+    const pct = tasks.length ? 100 * done / tasks.length : 0;
+    return `<button class="kid-summary ${key}" data-child="${key}" aria-pressed="${childFilter === key}" aria-label="סינון לפי ${kid.name}, ${done} מתוך ${tasks.length} בוצעו">
+      <span class="kid-name"><i aria-hidden="true">${kid.name[0]}</i>${kid.name}</span>
+      <span class="kid-total"><strong>${tasks.length - done}</strong> פתוחות</span>
+      <span class="meter"><i style="width:${pct}%"></i></span><small>${done} מתוך ${tasks.length} בוצעו</small>
+    </button>`;
+  }).join("");
+  document.querySelectorAll("[data-status]").forEach(button => {
+    button.setAttribute("aria-pressed", String(statusFilter === button.dataset.status));
+  });
+  const lu = document.getElementById("lastUpdated");
+  lu.textContent = DATA.updated ? "🕐 עדכון אחרון: " + formatUpdated(DATA.updated) : "";
+  if(DATA.updated) setSyncStatus("נתוני הגיליון עודכנו: " + formatUpdated(DATA.updated));
+  const sp = document.getElementById("sourcePulls");
+  const parts = [];
+  if(DATA.last_whatsapp) parts.push("נשלף מוואטסאפ: " + formatUpdated(DATA.last_whatsapp));
+  if(DATA.last_webtop) parts.push("נשלף מוובטופ: " + formatUpdated(DATA.last_webtop));
+  sp.textContent = parts.join(" · ");
+  const app = document.getElementById("app");
+  const kids = ["daniel","naya"].filter(k => childFilter === "all" || childFilter === k);
+  let html = "";
+  let totalOpen = 0, totalDone = 0;
+
+  for(const k of kids){
+    const all = DATA.tasks.filter(t => t.child === k);
+    const done = all.filter(t => t.done).length;
+    totalOpen += all.length - done; totalDone += done;
+    let list = all;
+    if(statusFilter === "open") list = all.filter(t => !t.done);
+    if(statusFilter === "done") list = all.filter(t => t.done);
+    list = sortTasks(list);
+    const kid = KIDS[k];
+    html += '<section class="child ' + kid.cls + '"><div class="child-head"><span class="dot ' + kid.cls
+      + '"></span><h2>המטלות של ' + kid.name + '</h2><span class="count">' + list.length + '</span></div>';
+
+    if(!list.length){
+      html += '<div class="empty">' + (statusFilter === "done" ? "עוד לא סומן שום דבר כבוצע" : "אין משימות פתוחות — כל הכבוד! 🎉") + "</div>";
+    }
+    for(const t of list){
+      const shortTitle = t.short || t.title;
+      const detailsText = (t.details || "").trim();
+      html += '<div class="card' + (t.done ? " done" : "") + '">'
+        + '<div class="card-top">'
+        + '<input type="checkbox" class="check" aria-label="סימון ביצוע: ' + esc(shortTitle) + '" data-id="' + esc(t.id) + '"' + (t.done ? " checked" : "") + '>'
+        + '<div class="card-main">'
+        + '<div class="title-row"><div class="title">' + esc(shortTitle) + "</div>" + duePill(t) + givenPill(t) + "</div>"
+        + '<div class="tags">'
+        + (t.subject ? '<span class="tag">' + esc(t.subject) + "</span>" : "")
+        + (t.kind ? '<span class="tag">' + esc(t.kind) + "</span>" : "")
+        + (t.carried ? '<span class="tag carried">🔁 נגרר משבוע שעבר</span>' : "")
+        + (t.is_new ? '<span class="tag isnew">✨ חדש השבוע</span>' : "")
+        + "</div>"
+        + "</div></div>"
+        + '<button class="details-btn" aria-expanded="false" aria-controls="det-' + esc(t.id) + '" data-id="' + esc(t.id) + '">פרטי המטלה</button>'
+        + '<div class="details" inert id="det-' + esc(t.id) + '"><div class="details-body">'
+        + (detailsText ? '<div class="details-text">' + esc(detailsText) + "</div>" : "")
+        + '<div class="details-meta">' + [t.due ? "מועד: " + esc(t.due) : "", t.source ? "מקור: " + esc(t.source) : ""].filter(Boolean).join(" · ") + "</div>";
+      if(t.links && t.links.length){
+        html += '<div class="links">' + t.links.map(l =>
+          '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + "</a>").join("") + "</div>";
+      }
+      html += "</div></div></div>";
+    }
+    html += "</section>";
+  }
+  if(childFilter === "all" && totalOpen === 0 && totalDone > 0){
+    html += '<div class="alldone">🎉 כל המשימות של השבוע בוצעו!</div>';
+  }
+  app.innerHTML = html;
+
+  app.querySelectorAll(".check").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = cb.dataset.id;
+      const done = cb.checked;
+      const selectedWeek = viewWeek;
+      const feedback = new Promise(resolve => setTimeout(resolve,
+        matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 250));
+      cb.disabled = true;
+      const card = cb.closest(".card");
+      card.classList.toggle("done", done);
+      try{
+        await fetchJSON("/api/tasks/" + encodeURIComponent(id) + "/done?week=" + encodeURIComponent(viewWeek), {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({done})
+        }, 5);
+        await feedback;
+        if (selectedWeek !== viewWeek) return;
+        const t = DATA.tasks.find(x => x.id === id);
+        if(t) t.done = done;
+        render();
+      }catch(e){
+        cb.disabled = false;
+        cb.checked = !done;
+        card.classList.toggle("done", !done);
+        alert("הסימון לא נשמר — נסו שוב.");
+      }
+    });
+  });
+
+  app.querySelectorAll(".details-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const det = document.getElementById("det-" + btn.dataset.id);
+      const open = det.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+      det.inert = !open;
+    });
+  });
+}
+
+async function fetchJSON(url, opts, attempts){
+  attempts = attempts || 6;
+  let delay = 300;
+  for(let i = 0; i < attempts; i++){
+    try{
+      const r = await fetch(url, opts);
+      if(!r.ok) throw new Error("http " + r.status);
+      return await r.json();
+    }catch(e){
+      if(i === attempts - 1) throw e;
+      await new Promise(res => setTimeout(res, delay));
+      delay = Math.min(delay * 2, 3000);
+    }
+  }
+}
+
+async function loadWeek(week){
+  try{
+    DATA = await fetchJSON("/api/tasks?week=" + encodeURIComponent(week));
+    viewWeek = DATA.week || week;
+    document.getElementById("err").style.display = "none";
+    render();
+  }catch(e){
+    document.getElementById("err").style.display = "block";
+  }
+}
+
+async function load(){
+  try{
+    WEEKS = await fetchJSON("/api/weeks");
+    viewWeek = WEEKS.current || "";
+    if(viewWeek) await loadWeek(viewWeek);
+    else { DATA = await fetchJSON("/api/tasks"); render(); }
+    lastLoadAt = Date.now();
+    await loadReminders();
+  }catch(e){
+    document.getElementById("err").style.display = "block";
+  }
+}
+
+document.querySelectorAll(".tab").forEach(b => {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+});
+document.getElementById("prevWeek").addEventListener("click", () => {
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  if(idx > 0) loadWeek(WEEKS.weeks[idx - 1]);
+});
+document.getElementById("nextWeek").addEventListener("click", () => {
+  const idx = WEEKS.weeks.indexOf(viewWeek);
+  if(idx >= 0 && idx < WEEKS.weeks.length - 1) loadWeek(WEEKS.weeks[idx + 1]);
+});
+document.querySelectorAll("#statusFilters .chip").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#statusFilters .chip").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    statusFilter = b.dataset.status;
+    render();
+  });
+});
+document.getElementById("overview").addEventListener("click", event => {
+  const button = event.target.closest("[data-child]");
+  if (!button) return;
+  childFilter = childFilter === button.dataset.child ? "all" : button.dataset.child;
+  render();
+  document.querySelector('#overview [data-child="' + button.dataset.child + '"]').focus({preventScroll:true});
+});
+
+document.getElementById("syncBtn").addEventListener("click", syncNow);
+document.getElementById("designToggle").addEventListener("click", () => {
+  const u = new URL(location.href);
+  u.searchParams.set("design", "old");
+  location.href = u.toString();
+});
+document.addEventListener("visibilitychange", () => {
+  // Coming back to the app after a while: refresh silently.
+  if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) syncNow();
+});
+
+document.getElementById("remDate").addEventListener("change", (e) => {
+  remDate = e.target.value || todayISO();
+  renderReminders();
+});
+document.getElementById("remToday").addEventListener("click", () => {
+  remDate = todayISO();
+  renderReminders();
+});
+document.getElementById("remAdd").addEventListener("click", addReminder);
+document.getElementById("remText").addEventListener("keydown", (e) => {
+  if(e.key === "Enter") addReminder();
+});
+
+document.getElementById("shareSched").addEventListener("click", async () => {
+  const btn = document.getElementById("shareSched");
+  const url = location.origin + location.pathname + "#schedule-" + schedDay;
+  try{
+    await navigator.clipboard.writeText(url);
+    btn.textContent = "✅ הקישור הועתק";
+  }catch(e){
+    window.prompt("העתיקו את הקישור:", url);
+    return;
+  }
+  setTimeout(() => { btn.textContent = "🔗 העתק קישור ליום הזה"; }, 2500);
+});
+
+(function initTabFromHash(){
+  const h = (location.hash || "").replace(/^#/, "");
+  if(h === "homework"){ switchTab("homework"); return; }
+  if(h === "schedule"){ switchTab("schedule"); return; }
+  if(h === "reminders"){ switchTab("reminders"); return; }
+  const m = h.match(/^schedule-([0-5])$/);
+  if(m){ schedDay = +m[1]; switchTab("schedule"); }
+})();
+
+load();
+</script>
+</body>
+</html>

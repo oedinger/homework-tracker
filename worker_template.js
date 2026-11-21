@@ -19,6 +19,7 @@
 // ~20s to show from another edge location).
 
 const HTML = __HTML_JSON__;
+const HTML_NEW = __HTML_NEW_JSON__;
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -77,7 +78,10 @@ export default {
     const path = url.pathname;
 
     if (path === '/' || path === '/index.html') {
-      return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      // Shadow mode: the new design is only served on ?design=new.
+      // Default (no param, or anything else) is the old design.
+      const html = url.searchParams.get('design') === 'new' ? HTML_NEW : HTML;
+      return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
     if (path === '/health') return json({ ok: true });
 
