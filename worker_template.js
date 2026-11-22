@@ -98,9 +98,8 @@ export default {
     const path = url.pathname;
 
     if (path === '/' || path === '/index.html') {
-      // Shadow mode: the new design is only served on ?design=new.
-      // Default (no param, or anything else) is the old design.
-      const html = url.searchParams.get('design') === 'new' ? HTML_NEW : HTML;
+      // New design is the default. The old design is served only on ?design=old.
+      const html = url.searchParams.get('design') === 'old' ? HTML : HTML_NEW;
       return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
     if (path === '/health') return json({ ok: true });
