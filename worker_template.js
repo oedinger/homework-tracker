@@ -2,6 +2,10 @@
 // KV keys:
 //   week:<week name> -> {week, updated, tasks: [...]}
 //   meta             -> {weeks: [...chronological...], current: "<week name>"}
+//   reminders          -> [{id, text, date, time, child, done, created}]
+//   feature-requests   -> [{id, type, text, by, status, created, updated}]
+//     type: "feature" | "bug"; by: "oren" | "lior" (only these two may ask);
+//     status: "open" | "in_progress" | "done" | "needs_info".
 // Legacy key "state" (single-week doc from the first deployment) is merged
 // once, when its week is synced, then deleted.
 // Task flags, computed at sync time:
@@ -11,6 +15,11 @@
 //             and carried forward for carried tasks)
 // Routes: GET / (page), GET /api/weeks, GET /api/tasks[?week=],
 // POST /api/tasks/:id/done[?week=],
+// GET /api/reminders, POST /api/reminders, POST /api/reminders/:id/done,
+// DELETE /api/reminders/:id,
+// GET /api/requests, POST /api/requests,
+// POST /api/requests/:id/status (Bearer SYNC_SECRET),
+// DELETE /api/requests/:id (Bearer SYNC_SECRET),
 // POST /api/sync (Bearer SYNC_SECRET — upserts one week, keeps meta current).
 //
 // NOTE: D1 was not available — the API token has no D1 scope (401 on every
@@ -70,6 +79,17 @@ async function putReminders(env, list) {
 }
 function reminderId() {
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// ---- feature requests / bug reports (KV key "feature-requests") ----
+async function getRequests(env) {
+  return (await env.HOMEWORK_KV.get('feature-requests', 'json')) || [];
+}
+async function putRequests(env, list) {
+  await env.HOMEWORK_KV.put('feature-requests', JSON.stringify(list.slice(0, 100)));
+}
+function requestId() {
+  return 'fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 export default {
@@ -151,6 +171,65 @@ export default {
       const kept = list.filter((x) => x.id !== id);
       if (kept.length === list.length) return json({ error: 'not found' }, 404);
       await putReminders(env, kept);
+      return json({ ok: true });
+    }
+
+    // ---- feature requests / bug reports (KV key "feature-requests") ----
+    // Only Oren and Lior may ask (enforced via `by` validation — there is
+    // no login; the site is not publicized). Status changes and deletes
+    // require the sync bearer secret, same as /api/sync.
+    if (path === '/api/requests' && request.method === 'GET') {
+      return json({ requests: await getRequests(env) });
+    }
+    if (path === '/api/requests' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const type = body.type === 'bug' ? 'bug' : body.type === 'feature' ? 'feature' : '';
+      const text = String(body.text || '').trim().slice(0, 500);
+      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
+      if (!type || !text || !by) {
+        return json({ error: 'type (feature|bug), text (1-500 chars) and by (oren|lior) are required' }, 400);
+      }
+      const now = new Date().toISOString();
+      const req = {
+        id: requestId(), type, text, by,
+        status: 'open', created: now, updated: now,
+      };
+      const list = await getRequests(env);
+      list.unshift(req);
+      await putRequests(env, list);
+      return json({ request: req }, 201);
+    }
+    const reqStatusMatch = path.match(/^\/api\/requests\/([^/]+)\/status$/);
+    if (reqStatusMatch && request.method === 'POST') {
+      const auth = request.headers.get('Authorization') || '';
+      if (auth !== 'Bearer ' + env.SYNC_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const status = ['open', 'in_progress', 'done', 'needs_info'].includes(body.status) ? body.status : '';
+      if (!status) return json({ error: 'status must be open|in_progress|done|needs_info' }, 400);
+      const id = decodeURIComponent(reqStatusMatch[1]);
+      const list = await getRequests(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      r.status = status;
+      r.updated = new Date().toISOString();
+      await putRequests(env, list);
+      return json(r);
+    }
+    const reqDelMatch = path.match(/^\/api\/requests\/([^/]+)$/);
+    if (reqDelMatch && request.method === 'DELETE') {
+      const auth = request.headers.get('Authorization') || '';
+      if (auth !== 'Bearer ' + env.SYNC_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const id = decodeURIComponent(reqDelMatch[1]);
+      const list = await getRequests(env);
+      const kept = list.filter((x) => x.id !== id);
+      if (kept.length === list.length) return json({ error: 'not found' }, 404);
+      await putRequests(env, kept);
       return json({ ok: true });
     }
 

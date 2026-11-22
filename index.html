@@ -221,6 +221,12 @@
   .rem-meta{font-size:13px; color:var(--muted); margin-top:3px}
   .rem-del{flex:none; border:none; background:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
+  /* ---- feature requests ---- */
+  .req-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); margin-inline-end:4px}
+  .req-badge.st-open{background:#fef3c7; color:#92400e}
+  .req-badge.st-in_progress{background:#dbeafe; color:#1e40af}
+  .req-badge.st-done{background:var(--green-soft); color:var(--green)}
+  .req-badge.st-needs_info{background:#fee2e2; color:#991b1b}
 </style>
 </head>
 <body>
@@ -239,6 +245,7 @@
     <button class="tab on" data-tab="homework">📚 שיעורי בית</button>
     <button class="tab" data-tab="schedule">🗓️ מערכת שעות</button>
     <button class="tab" data-tab="reminders">⏰ תזכורות</button>
+    <button class="tab" data-tab="requests">💡 בקשות</button>
   </nav>
 
   <div class="err" id="err">לא הצלחתי לטעון את המשימות — נסו לרענן את הדף.</div>
@@ -299,6 +306,25 @@
     </div>
     <div id="remApp"></div>
     <div class="sched-note">התזכורות נשמרות באתר ומשותפות לשניכם — מה שאחד מוסיף, השני רואה. הן לא נכנסות לגיליון שיעורי הבית.</div>
+  </div>
+
+  <div id="requestsView" style="display:none">
+    <div class="rem-form">
+      <input type="text" id="reqText" placeholder="מה להוסיף או לתקן? למשל: כפתור סינון לפי שבוע" maxlength="500">
+      <div class="rem-form-row">
+        <select id="reqType" aria-label="סוג הבקשה">
+          <option value="feature">✨ פיצ'ר חדש</option>
+          <option value="bug">🐛 תיקון באג</option>
+        </select>
+        <select id="reqBy" aria-label="מי מבקש/ת">
+          <option value="oren">אורן</option>
+          <option value="lior">ליאור</option>
+        </select>
+      </div>
+      <button class="rem-add" id="reqAdd">＋ שלח בקשה</button>
+    </div>
+    <div id="reqApp"></div>
+    <div class="sched-note">הבקשות נשמרות באתר — רק אורן וליאור יכולים לבקש פיצ'רים או לדווח על באגים, והן מטופלות אוטומטית. כשבקשה תטופל, הסטטוס שלה יתעדכן כאן.</div>
   </div>
 
   <footer>
@@ -452,11 +478,14 @@ function switchTab(tab){
   document.getElementById("homeworkView").style.display = tab === "homework" ? "block" : "none";
   document.getElementById("scheduleView").style.display = tab === "schedule" ? "block" : "none";
   document.getElementById("remindersView").style.display = tab === "reminders" ? "block" : "none";
+  document.getElementById("requestsView").style.display = tab === "requests" ? "block" : "none";
   if(tab === "schedule") renderSchedule();
   if(tab === "reminders") renderReminders();
+  if(tab === "requests") renderRequests();
   try{
     const h = tab === "homework" ? "#homework"
       : tab === "reminders" ? "#reminders"
+      : tab === "requests" ? "#requests"
       : "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "");
     history.replaceState(null, "", h);
   }catch(e){}
@@ -548,6 +577,57 @@ function renderReminders(){
   });
 }
 
+/* ---- feature requests / bug reports (shared, stored in KV via /api/requests) ---- */
+let REQUESTS = [];
+const REQ_STATUS = {open:"פתוח", in_progress:"בטיפול", done:"בוצע", needs_info:"דרוש הבהרה"};
+const REQ_TYPE = {feature:"✨ פיצ'ר חדש", bug:"🐛 תיקון באג"};
+const REQ_BY = {oren:"אורן", lior:"ליאור"};
+
+function renderRequests(){
+  const app = document.getElementById("reqApp");
+  if(!REQUESTS.length){
+    app.innerHTML = '<div class="rem-empty">אין בקשות — יש רעיון לשיפור או באג לדווח? כתבו למעלה 🙂</div>';
+    return;
+  }
+  app.innerHTML = REQUESTS.map(r => {
+    const d = r.created ? shortDate(String(r.created).slice(0, 10)) : "";
+    return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
+      + '<div class="rem-meta"><span class="req-badge">' + (REQ_TYPE[r.type] || esc(r.type)) + "</span>"
+      + '<span class="req-badge st-' + esc(r.status) + '">' + (REQ_STATUS[r.status] || esc(r.status)) + "</span>"
+      + " · " + (REQ_BY[r.by] || esc(r.by)) + (d ? " · " + d : "") + "</div></div></div>";
+  }).join("");
+}
+
+async function loadRequests(){
+  try{
+    const data = await fetchJSON("/api/requests", null, 3);
+    REQUESTS = data.requests || [];
+    if(activeTab === "requests") renderRequests();
+  }catch(e){ /* requests stay as-is; the tab shows the empty state */ }
+}
+
+async function addRequest(){
+  const textEl = document.getElementById("reqText");
+  const text = (textEl.value || "").trim();
+  if(!text){ textEl.focus(); return; }
+  const btn = document.getElementById("reqAdd");
+  btn.disabled = true;
+  try{
+    const created = await fetchJSON("/api/requests", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text,
+        type: document.getElementById("reqType").value,
+        by: document.getElementById("reqBy").value
+      })
+    }, 3);
+    REQUESTS.unshift(created.request);
+    textEl.value = "";
+    renderRequests();
+  }catch(e){ alert("הבקשה לא נשלחה — נסו שוב."); }
+  btn.disabled = false;
+}
+
 async function loadReminders(){
   try{
     const data = await fetchJSON("/api/reminders", null, 3);
@@ -592,6 +672,7 @@ async function syncNow(){
     if(viewWeek) await loadWeek(viewWeek);
     else { DATA = await fetchJSON("/api/tasks"); render(); }
     await loadReminders();
+    await loadRequests();
     lastLoadAt = Date.now();
     const now = new Date();
     setSyncStatus("✅ סונכרן " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
@@ -825,6 +906,7 @@ async function load(){
     else { DATA = await fetchJSON("/api/tasks"); render(); }
     lastLoadAt = Date.now();
     await loadReminders();
+    await loadRequests();
   }catch(e){
     document.getElementById("err").style.display = "block";
   }
@@ -881,6 +963,10 @@ document.getElementById("remAdd").addEventListener("click", addReminder);
 document.getElementById("remText").addEventListener("keydown", (e) => {
   if(e.key === "Enter") addReminder();
 });
+document.getElementById("reqAdd").addEventListener("click", addRequest);
+document.getElementById("reqText").addEventListener("keydown", (e) => {
+  if(e.key === "Enter") addRequest();
+});
 
 document.getElementById("shareSched").addEventListener("click", async () => {
   const btn = document.getElementById("shareSched");
@@ -900,6 +986,7 @@ document.getElementById("shareSched").addEventListener("click", async () => {
   if(h === "homework"){ switchTab("homework"); return; }
   if(h === "schedule"){ switchTab("schedule"); return; }
   if(h === "reminders"){ switchTab("reminders"); return; }
+  if(h === "requests"){ switchTab("requests"); return; }
   const m = h.match(/^schedule-([0-5])$/);
   if(m){ schedDay = +m[1]; switchTab("schedule"); }
 })();
