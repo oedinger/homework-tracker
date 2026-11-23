@@ -2,7 +2,11 @@
 // KV keys:
 //   week:<week name> -> {week, updated, tasks: [...]}
 //   meta             -> {weeks: [...chronological...], current: "<week name>"}
-//   reminders          -> [{id, text, date, time, child, done, created}]
+//   reminders          -> [{id, text, date, time, child, done, created,
+//                           createdBy, owner, seen, seenAt, notified}]
+//     child: "all" | "daniel" | "naya" | "ben" | "alin";
+//     createdBy/owner: "oren" | "lior". Old entries without the new fields
+//     are treated as createdBy=owner="oren", seen=false, notified=false.
 //   feature-requests   -> [{id, type, text, by, status, created, updated}]
 //     type: "feature" | "bug"; by: "oren" | "lior" (only these two may ask);
 //     status: "open" | "in_progress" | "done" | "needs_info".
@@ -15,7 +19,9 @@
 //             and carried forward for carried tasks)
 // Routes: GET / (page), GET /api/weeks, GET /api/tasks[?week=],
 // POST /api/tasks/:id/done[?week=],
-// GET /api/reminders, POST /api/reminders, POST /api/reminders/:id/done,
+// GET /api/reminders, POST /api/reminders, PATCH /api/reminders/:id,
+// POST /api/reminders/:id/done, POST /api/reminders/:id/seen,
+// POST /api/reminders/:id/notify (Bearer SYNC_SECRET),
 // DELETE /api/reminders/:id,
 // GET /api/requests, POST /api/requests,
 // POST /api/requests/:id/status (Bearer SYNC_SECRET),
@@ -80,6 +86,19 @@ async function putReminders(env, list) {
 function reminderId() {
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+const REM_CHILDREN = ['all', 'daniel', 'naya', 'ben', 'alin'];
+const isPerson = (v) => v === 'oren' || v === 'lior';
+// Backward compatibility: old reminders lack createdBy/owner/seen/notified.
+function normReminder(r) {
+  return {
+    ...r,
+    createdBy: isPerson(r.createdBy) ? r.createdBy : 'oren',
+    owner: isPerson(r.owner) ? r.owner : 'oren',
+    seen: !!r.seen,
+    seenAt: r.seenAt || null,
+    notified: !!r.notified,
+  };
+}
 
 // ---- feature requests / bug reports (KV key "feature-requests") ----
 async function getRequests(env) {
@@ -130,7 +149,7 @@ export default {
 
     // ---- reminders ----
     if (path === '/api/reminders' && request.method === 'GET') {
-      return json({ reminders: await getReminders(env) });
+      return json({ reminders: (await getReminders(env)).map(normReminder) });
     }
     if (path === '/api/reminders' && request.method === 'POST') {
       let body = {};
@@ -141,10 +160,13 @@ export default {
         return json({ error: 'text and date (YYYY-MM-DD) are required' }, 400);
       }
       const time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? body.time : '';
-      const child = ['all', 'daniel', 'naya'].includes(body.child) ? body.child : 'all';
+      const child = REM_CHILDREN.includes(body.child) ? body.child : 'all';
+      const createdBy = isPerson(body.createdBy) ? body.createdBy : 'oren';
+      const owner = isPerson(body.owner) ? body.owner : 'oren';
       const reminder = {
         id: reminderId(), text, date, time, child, done: false,
         created: new Date().toISOString(),
+        createdBy, owner, seen: false, seenAt: null, notified: false,
       };
       const list = await getReminders(env);
       list.push(reminder);
@@ -162,6 +184,80 @@ export default {
       r.done = !!body.done;
       await putReminders(env, list);
       return json(r);
+    }
+    const remPatchMatch = path.match(/^\/api\/reminders\/([^/]+)$/);
+    if (remPatchMatch && request.method === 'PATCH') {
+      const id = decodeURIComponent(remPatchMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const list = await getReminders(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      const nr = normReminder(r);
+      if (body.text !== undefined) {
+        const text = String(body.text || '').trim().slice(0, 200);
+        if (!text) return json({ error: 'text must not be empty' }, 400);
+        nr.text = text;
+      }
+      if (body.date !== undefined) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date))) {
+          return json({ error: 'date must be YYYY-MM-DD' }, 400);
+        }
+        nr.date = body.date;
+      }
+      if (body.time !== undefined) {
+        nr.time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? body.time : '';
+      }
+      if (body.child !== undefined) {
+        if (!REM_CHILDREN.includes(body.child)) {
+          return json({ error: 'child must be all|daniel|naya|ben|alin' }, 400);
+        }
+        nr.child = body.child;
+      }
+      if (body.owner !== undefined) {
+        if (!isPerson(body.owner)) {
+          return json({ error: 'owner must be oren|lior' }, 400);
+        }
+        // Reassigned to someone else: new owner must be notified + ack.
+        if (body.owner !== nr.owner) {
+          nr.owner = body.owner;
+          nr.notified = false;
+          nr.seen = false;
+          nr.seenAt = null;
+        }
+      }
+      Object.assign(r, nr);
+      await putReminders(env, list);
+      return json(normReminder(r));
+    }
+    const remSeenMatch = path.match(/^\/api\/reminders\/([^/]+)\/seen$/);
+    if (remSeenMatch && request.method === 'POST') {
+      const id = decodeURIComponent(remSeenMatch[1]);
+      const list = await getReminders(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      const nr = normReminder(r);
+      nr.seen = true;
+      nr.seenAt = new Date().toISOString();
+      Object.assign(r, nr);
+      await putReminders(env, list);
+      return json(normReminder(r));
+    }
+    const remNotifyMatch = path.match(/^\/api\/reminders\/([^/]+)\/notify$/);
+    if (remNotifyMatch && request.method === 'POST') {
+      const auth = request.headers.get('Authorization') || '';
+      if (auth !== 'Bearer ' + env.SYNC_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const id = decodeURIComponent(remNotifyMatch[1]);
+      const list = await getReminders(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      const nr = normReminder(r);
+      nr.notified = true;
+      Object.assign(r, nr);
+      await putReminders(env, list);
+      return json(normReminder(r));
     }
     const remDelMatch = path.match(/^\/api\/reminders\/([^/]+)$/);
     if (remDelMatch && request.method === 'DELETE') {

@@ -220,6 +220,11 @@
   .rem-text{font-weight:700; font-size:15px; line-height:1.4}
   .rem-meta{font-size:13px; color:var(--muted); margin-top:3px}
   .rem-del{flex:none; border:none; background:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px}
+  .rem-actions{flex:none; display:flex; gap:2px; align-items:flex-start}
+  .rem-seen{flex:none; border:1.5px solid var(--accent); background:var(--card); color:var(--accent); border-radius:999px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap}
+  .rem-seen:disabled{opacity:.6}
+  .rem-cancel{width:100%; margin-top:8px; border:none; background:none; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; padding:8px}
+  .rem-label{font-size:12px; color:var(--muted); font-weight:700; margin:8px 0 2px}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
   /* ---- feature requests ---- */
   .req-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); margin-inline-end:4px}
@@ -507,15 +512,28 @@
       <div class="rem-form-row">
         <input type="time" id="remTime" aria-label="שעה">
         <select id="remChild" aria-label="למי">
-          <option value="all">שני הילדים</option>
+          <option value="all">כל הילדים</option>
           <option value="daniel">🔵 דניאל</option>
           <option value="naya">🩷 נאיה</option>
+          <option value="ben">🟢 בן</option>
+          <option value="alin">🟣 אלין</option>
+        </select>
+      </div>
+      <div class="rem-form-row" style="margin-top:8px">
+        <select id="remBy" aria-label="מי מוסיף/ה">
+          <option value="oren">מוסיף/ה: אורן</option>
+          <option value="lior">מוסיף/ה: ליאור</option>
+        </select>
+        <select id="remOwner" aria-label="מי אחראי/ת">
+          <option value="oren">אחראי/ת: אורן</option>
+          <option value="lior">אחראי/ת: ליאור</option>
         </select>
       </div>
       <button class="rem-add" id="remAdd">＋ הוסף תזכורת</button>
+      <button class="rem-cancel" id="remCancel" style="display:none">ביטול העריכה</button>
     </div>
     <div id="remApp"></div>
-    <div class="sched-note">התזכורות נשמרות באתר ומשותפות לשניכם — מה שאחד מוסיף, השני רואה. הן לא נכנסות לגיליון שיעורי הבית.</div>
+    <div class="sched-note">התזכורות נשמרות באתר ומשותפות לשניכם — מה שאחד מוסיף, השני רואה. אפשר לשייך כל תזכורת לאחד מארבעת הילדים ולאורן או לליאור כאחראי/ת — מי שאחראי/ת מקבל/ת הודעת וואטסאפ ומסמן/ת 👁 ראיתי. הן לא נכנסות לגיליון שיעורי הבית.</div>
   </div>
 
   <div id="requestsView" style="display:none">
@@ -726,14 +744,32 @@ function remSort(list){
   });
 }
 
+const REM_KIDS = {
+  all:    { name: "כל הילדים", emoji: "👨‍👩‍👧‍👦" },
+  daniel: { name: "דניאל", emoji: "🔵" },
+  naya:   { name: "נאיה",  emoji: "🩷" },
+  ben:    { name: "בן",    emoji: "🟢" },
+  alin:   { name: "אלין",  emoji: "🟣" }
+};
+const REM_PERSONS = { oren: "אורן", lior: "ליאור" };
+
 function remRow(r){
-  const kid = r.child && KIDS[r.child] ? KIDS[r.child].emoji + " " + KIDS[r.child].name : "שני הילדים";
-  const meta = [r.time ? "🕐 " + esc(r.time) : "", kid].filter(Boolean).join(" · ");
+  const kid = r.child && REM_KIDS[r.child] ? REM_KIDS[r.child].emoji + " " + REM_KIDS[r.child].name : "כל הילדים";
+  const owner = REM_PERSONS[r.owner] || "אורן";
+  const creator = REM_PERSONS[r.createdBy] || "אורן";
+  const metaParts = [r.time ? "🕐 " + esc(r.time) : "", kid, "אחראי/ת: " + owner];
+  if(creator !== owner) metaParts.push("מוסיף/ה: " + creator);
+  if(r.seen) metaParts.push("✓ נראתה" + (r.seenAt ? " · " + shortDate(String(r.seenAt).slice(0, 10)) + " " + String(r.seenAt).slice(11, 16) : ""));
+  const meta = metaParts.filter(Boolean).join(" · ");
+  const seenBtn = (!r.done && !r.seen)
+    ? '<button class="rem-seen" data-id="' + esc(r.id) + '">👁 ראיתי</button>' : "";
   return '<div class="rem-row' + (r.done ? " done" : "") + '">'
     + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
     + '<div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
     + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + "</div>"
-    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div>';
+    + '<div class="rem-actions">' + seenBtn
+    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="ערוך תזכורת" data-edit="1">✏️</button>'
+    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
 }
 
 function renderReminders(){
@@ -789,7 +825,7 @@ function renderReminders(){
       }
     });
   });
-  document.querySelectorAll("#remApp .rem-del").forEach(btn => {
+  document.querySelectorAll("#remApp .rem-del:not([data-edit])").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       if(!confirm("למחוק את התזכורת?")) return;
@@ -799,6 +835,21 @@ function renderReminders(){
         renderReminders();
       }catch(e){ alert("המחיקה נכשלה — נסו שוב."); }
     });
+  });
+  document.querySelectorAll("#remApp .rem-seen").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      try{
+        const updated = await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/seen", {method: "POST"}, 3);
+        const r = REMINDERS.find(x => x.id === id);
+        if(r && updated){ r.seen = updated.seen; r.seenAt = updated.seenAt; }
+        renderReminders();
+      }catch(e){ btn.disabled = false; alert("הסימון לא נשמר — נסו שוב."); }
+    });
+  });
+  document.querySelectorAll("#remApp .rem-del[data-edit]").forEach(btn => {
+    btn.addEventListener("click", () => startEditReminder(btn.dataset.id));
   });
 }
 
@@ -861,27 +912,73 @@ async function loadReminders(){
   }catch(e){ /* reminders stay as-is; the tab shows the empty state */ }
 }
 
+let remEditingId = null;
+
+function fillReminderForm(r){
+  document.getElementById("remText").value = r.text || "";
+  document.getElementById("remTime").value = r.time || "";
+  document.getElementById("remChild").value = (r.child || "all");
+  document.getElementById("remBy").value = (r.createdBy || "oren");
+  document.getElementById("remOwner").value = (r.owner || "oren");
+  if(r.date){
+    remDate = r.date;
+    const di = document.getElementById("remDate");
+    if(di) di.value = r.date;
+  }
+}
+
+function startEditReminder(id){
+  const r = REMINDERS.find(x => x.id === id);
+  if(!r) return;
+  remEditingId = id;
+  fillReminderForm(r);
+  document.getElementById("remAdd").textContent = "💾 שמור שינויים";
+  document.getElementById("remCancel").style.display = "";
+  document.getElementById("remText").focus();
+}
+
+function cancelEditReminder(){
+  remEditingId = null;
+  document.getElementById("remText").value = "";
+  document.getElementById("remTime").value = "";
+  document.getElementById("remAdd").textContent = "＋ הוסף תזכורת";
+  document.getElementById("remCancel").style.display = "none";
+}
+
 async function addReminder(){
   const textEl = document.getElementById("remText");
   const text = (textEl.value || "").trim();
   if(!text){ textEl.focus(); return; }
   const btn = document.getElementById("remAdd");
   btn.disabled = true;
+  const payload = {
+    text,
+    date: remDate || todayISO(),
+    time: document.getElementById("remTime").value || "",
+    child: document.getElementById("remChild").value || "all",
+    createdBy: document.getElementById("remBy").value || "oren",
+    owner: document.getElementById("remOwner").value || "oren"
+  };
   try{
-    const created = await fetchJSON("/api/reminders", {
-      method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        text,
-        date: remDate || todayISO(),
-        time: document.getElementById("remTime").value || "",
-        child: document.getElementById("remChild").value || "all"
-      })
-    }, 3);
-    if(created.reminder) REMINDERS.push(created.reminder);
-    textEl.value = "";
-    document.getElementById("remTime").value = "";
+    if(remEditingId){
+      const updated = await fetchJSON("/api/reminders/" + encodeURIComponent(remEditingId), {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      }, 3);
+      const i = REMINDERS.findIndex(x => x.id === remEditingId);
+      if(i >= 0 && updated) REMINDERS[i] = updated;
+      cancelEditReminder();
+    }else{
+      const created = await fetchJSON("/api/reminders", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      }, 3);
+      if(created.reminder) REMINDERS.push(created.reminder);
+      textEl.value = "";
+      document.getElementById("remTime").value = "";
+    }
     renderReminders();
-  }catch(e){ alert("התזכורת לא נשמרה — נסו שוב."); }
+  }catch(e){ alert(remEditingId ? "השינויים לא נשמרו — נסו שוב." : "התזכורת לא נשמרה — נסו שוב."); }
   btn.disabled = false;
 }
 
@@ -1201,6 +1298,7 @@ document.getElementById("remToday").addEventListener("click", () => {
   renderReminders();
 });
 document.getElementById("remAdd").addEventListener("click", addReminder);
+document.getElementById("remCancel").addEventListener("click", cancelEditReminder);
 document.getElementById("remText").addEventListener("keydown", (e) => {
   if(e.key === "Enter") addReminder();
 });
