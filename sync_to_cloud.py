@@ -125,8 +125,17 @@ def build_tasks(week):
         title = cells[4].strip()
         if not title or title == "מטלה" or child is None:
             continue
+        # The id must distinguish repeated instances of a recurring title
+        # within one week: the same title can be given again (e.g. Naya's
+        # weekly "סיפור לשבת") while the previous instance is still open,
+        # so both rows sit in the same week tab. Including the given date
+        # (falling back to the due date) gives each instance its own id;
+        # without it the two rows collide and share one done flag.
+        given_iso = parse_due_iso(cells[3])
+        due_iso = parse_due_iso(cells[2])
+        date_key = given_iso or due_iso
         tid = "t-" + hashlib.sha1(
-            f"{child}|{week}|{title}".encode("utf-8")).hexdigest()[:12]
+            f"{child}|{week}|{title}|{date_key}".encode("utf-8")).hexdigest()[:12]
         short, details = split_title(title)
         tasks.append({
             "id": tid,
@@ -137,9 +146,9 @@ def build_tasks(week):
             "short": short,
             "details": details,
             "due": cells[2].strip(),
-            "due_iso": parse_due_iso(cells[2]),
+            "due_iso": due_iso,
             "given": cells[3].strip(),
-            "given_iso": parse_due_iso(cells[3]),
+            "given_iso": given_iso,
             "source": cells[7].strip(),
             "links": parse_links(cells[0]),
             "done": cells[1].strip() == "בוצע",

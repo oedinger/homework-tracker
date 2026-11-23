@@ -16,7 +16,11 @@
 //   carried — the task (same child + title) was in the previous week's list
 //   is_new  — it was not (added this week)
 //   done    — sheet "בוצע" OR the site's own checkmark (preserved per week,
-//             and carried forward for carried tasks)
+//             and carried forward for carried tasks). Done is preserved per
+//             task INSTANCE: matching is by child + title + given date, so
+//             two instances of one recurring title keep separate flags
+//             (see findTask). Task ids in the sync payload include the
+//             given date for the same reason.
 // Routes: GET / (page), GET /api/weeks, GET /api/tasks[?week=],
 // POST /api/tasks/:id/done[?week=],
 // GET /api/reminders, POST /api/reminders, PATCH /api/reminders/:id,
@@ -71,9 +75,22 @@ async function getCurrentDoc(env) {
   return legacy || { week: '', updated: '', tasks: [] };
 }
 
-function findTask(doc, child, title) {
+function findTask(doc, child, title, givenIso) {
   if (!doc) return null;
-  return doc.tasks.find((t) => t.child === child && t.title === title) || null;
+  // Match one specific instance of a title: the same title can appear
+  // twice in one week (a recurring task re-given while the previous
+  // instance is still open), and the two rows must keep separate done
+  // flags. The given date disambiguates them.
+  if (givenIso) {
+    const exact = doc.tasks.find(
+      (t) => t.child === child && t.title === title && (t.given_iso || '') === givenIso);
+    if (exact) return exact;
+  }
+  // Fallback for rows with no given date: only unambiguous when the
+  // title occurs once in this doc; otherwise return null so no done
+  // state leaks from one instance to another.
+  const matches = doc.tasks.filter((t) => t.child === child && t.title === title);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 // ---- shared reminders (KV key "reminders", one array, max 200) ----
@@ -380,8 +397,8 @@ export default {
       let carried = 0;
       let isNew = 0;
       const tasks = (data.tasks || []).map((t) => {
-        const same = findTask(sameDoc, t.child, t.title);
-        const prev = findTask(prevDoc, t.child, t.title);
+        const same = findTask(sameDoc, t.child, t.title, t.given_iso);
+        const prev = findTask(prevDoc, t.child, t.title, t.given_iso);
         const c = same ? !!(same.carried ?? !!prev) : !!prev;
         const n = same ? !!(same.is_new ?? !c) : !c;
         const done = !!(t.done || (same && same.done) || (c && prev && prev.done));
