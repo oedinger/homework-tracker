@@ -28,3 +28,7 @@ https://homework.oedinger.stream, with a per-day school schedule tab
 - `tasks.json` — runtime data, changes every 2h (excluded).
 - `.sync-secret` — bearer secret for the sync endpoint (excluded, never
   commit it).
+
+## Workflow (Pi)
+
+All GitHub work for this repo runs from the Pi: edit in ~/github/homework-tracker, commit and push with git over SSH (pi-backup key). Pushes from the Pi need no Muse approval card.
