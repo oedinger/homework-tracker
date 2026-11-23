@@ -10,7 +10,7 @@
     --accent:#d97757; --accent-soft:#fdeee6;
     --daniel:#2563eb; --daniel-soft:#dbeafe;
     --naya:#db2777; --naya-soft:#fce7f3;
-    --green:#16a34a; --green-soft:#dcfce7;
+    --green:#16a34a; --green-soft:#dcfce7; --yellow-soft:#fef9c3;
     --amber:#b45309; --amber-soft:#fef3c7;
     --red:#dc2626; --red-soft:#fee2e2;
     --line:#f0e3d3; --radius:20px;
@@ -226,19 +226,21 @@
   .rem-cancel{width:100%; margin-top:8px; border:none; background:none; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; padding:8px}
   .rem-label{font-size:12px; color:var(--muted); font-weight:700; margin:8px 0 2px}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
-  .rem-row.seen{background:var(--green-soft); border-color:#86c79a}
-  .rem-seen-line{font-size:13px; color:var(--green); font-weight:700; margin-top:3px}
+  .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
+  .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
   .due-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:#fee2e2; color:#991b1b; margin-inline-start:6px}
   .rem-archive{margin:16px 4px 0}
   .rem-archive summary{cursor:pointer; font-weight:800; font-size:15px; padding:10px 4px}
-  .rem-row.seen{background:var(--green-soft); border-color:#86c79a}
-  .rem-seen-line{font-size:13px; color:var(--green); font-weight:700; margin-top:3px}
+  .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
+  .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
   .due-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:#fee2e2; color:#991b1b; margin-inline-start:6px}
   .rem-archive{margin:16px 4px 0}
   .rem-archive summary{cursor:pointer; font-weight:800; font-size:15px; padding:10px 4px}
-  .rem-filters{margin:12px 4px 2px}
-  .rem-frow{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px}
-  .rem-flabel{font-size:12px; font-weight:700; color:var(--muted); margin-inline-end:2px}
+  .rem-filters{display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:10px 4px 2px}
+  .rem-fsel{display:flex; align-items:center; gap:4px; flex:1 1 calc(50% - 5px); min-width:0}
+  .rem-flabel{font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap}
+  .rem-fsel select{flex:1; min-width:0; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:6px 4px; font-size:13px; font-weight:700; font-family:inherit}
+  @media (min-width:600px){.rem-fsel{flex:1 1 auto}}
   .rem-clear{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer}
   /* ---- feature requests ---- */
   .req-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); margin-inline-end:4px}
@@ -594,7 +596,7 @@ function remMatches(r){
   if(REM_FILTERS.state === "today" && !remIsDueToday(r)) return false;
   return true;
 }
-function remFilterChips(){
+function remFilterBar(){
   const rows = [
     { key: "owner", label: "אחראי/ת:", opts: [["all", "הכל"], ["oren", "אורן"], ["lior", "ליאור"]] },
     { key: "child", label: "ילד/ה:", opts: [["all", "הכל"], ["daniel", "🔵 דניאל"], ["naya", "🩷 נאיה"], ["ben", "🟢 בן"], ["alin", "🟣 אלין"]] },
@@ -602,8 +604,8 @@ function remFilterChips(){
     { key: "state", label: "מצב:", opts: [["all", "הכל"], ["late", "⏰ באיחור"], ["today", "📅 מסתיימות היום"]] }
   ];
   return '<div class="rem-filters">' + rows.map(row =>
-    '<div class="rem-frow"><span class="rem-flabel">' + row.label + "</span>" + row.opts.map(o =>
-      '<button class="chip' + (REM_FILTERS[row.key] === o[0] ? " on" : "") + '" data-f="' + row.key + '" data-v="' + o[0] + '">' + o[1] + "</button>").join("") + "</div>").join("") + "</div>";
+    '<label class="rem-fsel"><span class="rem-flabel">' + row.label + "</span>" + '<select data-f="' + row.key + '">' + row.opts.map(o =>
+      '<option value="' + o[0] + '"' + (REM_FILTERS[row.key] === o[0] ? " selected" : "") + ">" + o[1] + "</option>").join("") + "</select></label>").join("") + "</div>";
 }
 
 function renderReminders(){
@@ -611,7 +613,7 @@ function renderReminders(){
   if(dateInput && !dateInput.value) dateInput.value = todayISO();
   const open = remSort(REMINDERS.filter(r => !r.done && remMatches(r)));
   const doneList = remSort(REMINDERS.filter(r => r.done && remMatches(r))).reverse();
-  let html = remFilterChips();
+  let html = remFilterBar();
   if(open.length){
     html += open.map(remRow).join("");
   }else if(doneList.length){
@@ -627,9 +629,9 @@ function renderReminders(){
   }
   document.getElementById("remApp").innerHTML = html;
 
-  document.querySelectorAll("#remApp .rem-frow .chip").forEach(b => {
-    b.addEventListener("click", () => {
-      REM_FILTERS[b.dataset.f] = b.dataset.v;
+  document.querySelectorAll("#remApp .rem-filters select").forEach(s => {
+    s.addEventListener("change", () => {
+      REM_FILTERS[s.dataset.f] = s.value;
       renderReminders();
     });
   });
