@@ -226,6 +226,11 @@
   .rem-cancel{width:100%; margin-top:8px; border:none; background:none; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; padding:8px}
   .rem-label{font-size:12px; color:var(--muted); font-weight:700; margin:8px 0 2px}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
+  .rem-row.seen{background:var(--green-soft); border-color:#86c79a}
+  .rem-seen-line{font-size:13px; color:var(--green); font-weight:700; margin-top:3px}
+  .due-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:#fee2e2; color:#991b1b; margin-inline-start:6px}
+  .rem-archive{margin:16px 4px 0}
+  .rem-archive summary{cursor:pointer; font-weight:800; font-size:15px; padding:10px 4px}
   /* ---- feature requests ---- */
   .req-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); margin-inline-end:4px}
   .req-badge.st-open{background:#fef3c7; color:#92400e}
@@ -502,15 +507,15 @@
 
   <div id="remindersView" style="display:none">
     <h2 class="page-heading">תזכורות משפחתיות</h2>
-    <div class="rem-date-row">
-      <input type="date" id="remDate" aria-label="תאריך">
-      <button class="rem-today" id="remToday">היום</button>
-    </div>
     <div class="rem-form">
       <label class="form-title" for="remText">תזכורת חדשה</label>
       <input type="text" id="remText" placeholder="מה להזכיר? למשל: להביא חולצת ספורט" maxlength="200">
+      <div class="rem-label">תאריך ושעת סיום *</div>
       <div class="rem-form-row">
-        <input type="time" id="remTime" aria-label="שעה">
+        <input type="date" id="remDate" aria-label="תאריך סיום" required>
+        <input type="time" id="remTime" aria-label="שעת סיום" required>
+      </div>
+      <div class="rem-form-row" style="margin-top:8px">
         <select id="remChild" aria-label="למי">
           <option value="all">כל הילדים</option>
           <option value="daniel">🔵 דניאל</option>
@@ -578,7 +583,6 @@ let childFilter = "all";
 
 /* ---- reminders (shared, stored in KV via /api/reminders) ---- */
 let REMINDERS = [];
-let remDate = ""; // set to today on first render (todayISO is defined below)
 let lastLoadAt = 0;
 
 /* ---- weekly timetable (static reference data, updated 17/11/2026) ----
@@ -735,11 +739,22 @@ function switchTab(tab){
 }
 
 /* ---- reminders tab ---- */
+// Due datetime, nearest first. Missing time (old reminders) = end of that day.
+function remDueKey(r){
+  return (r.date || "9999-12-31") + "T" + (r.time || "23:59");
+}
+function remDueNowKey(){
+  const n = new Date();
+  return isoOf(n) + "T" + String(n.getHours()).padStart(2, "0") + ":" + String(n.getMinutes()).padStart(2, "0");
+}
+function remIsOverdue(r){
+  if(r.done) return false;
+  return remDueKey(r) < remDueNowKey();
+}
 function remSort(list){
   return list.slice().sort((a, b) => {
-    if(a.done !== b.done) return a.done ? 1 : -1;
-    const ta = a.time || "99:99", tb = b.time || "99:99";
-    if(ta !== tb) return ta < tb ? -1 : 1;
+    const ka = remDueKey(a), kb = remDueKey(b);
+    if(ka !== kb) return ka < kb ? -1 : 1;
     return (a.created || "") < (b.created || "") ? -1 : 1;
   });
 }
@@ -757,52 +772,40 @@ function remRow(r){
   const kid = r.child && REM_KIDS[r.child] ? REM_KIDS[r.child].emoji + " " + REM_KIDS[r.child].name : "כל הילדים";
   const owner = REM_PERSONS[r.owner] || "אורן";
   const creator = REM_PERSONS[r.createdBy] || "אורן";
-  const metaParts = [r.time ? "🕐 " + esc(r.time) : "", kid, "אחראי/ת: " + owner];
+  const due = (r.date ? "📅 " + shortDate(r.date) : "") + (r.time ? " " + esc(r.time) : "");
+  const overdue = remIsOverdue(r);
+  const metaParts = [due, kid, "אחראי/ת: " + owner];
   if(creator !== owner) metaParts.push("מוסיף/ה: " + creator);
-  if(r.seen) metaParts.push("✓ נראתה" + (r.seenAt ? " · " + shortDate(String(r.seenAt).slice(0, 10)) + " " + String(r.seenAt).slice(11, 16) : ""));
   const meta = metaParts.filter(Boolean).join(" · ");
+  const seenBy = REM_PERSONS[r.seenBy] || (r.seen ? owner : "");
+  const seenLine = r.seen
+    ? '<div class="rem-seen-line">✓ נצפתה על ידי ' + esc(seenBy) + (r.seenAt ? " · " + shortDate(String(r.seenAt).slice(0, 10)) + " " + String(r.seenAt).slice(11, 16) : "") + "</div>" : "";
   const seenBtn = (!r.done && !r.seen)
     ? '<button class="rem-seen" data-id="' + esc(r.id) + '">👁 ראיתי</button>' : "";
-  return '<div class="rem-row' + (r.done ? " done" : "") + '">'
+  return '<div class="rem-row' + (r.done ? " done" : "") + (r.seen && !r.done ? " seen" : "") + '">'
     + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
-    + '<div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
-    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + "</div>"
+    + '<div class="rem-main"><div class="rem-text">' + esc(r.text)
+    + (overdue ? '<span class="due-badge">⏰ באיחור</span>' : "") + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + "</div>"
     + '<div class="rem-actions">' + seenBtn
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="ערוך תזכורת" data-edit="1">✏️</button>'
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
 }
 
 function renderReminders(){
-  if(!remDate) remDate = todayISO();
   const dateInput = document.getElementById("remDate");
-  if(dateInput && dateInput.value !== remDate) dateInput.value = remDate;
-  const isToday = remDate === todayISO();
-  const d = new Date(remDate + "T12:00:00");
-  const dayLabel = isToday ? "היום" : "יום " + HEB_DAYS[d.getDay()];
-  let html = '<div class="sched-day">' + dayLabel + " · " + shortDate(remDate)
-    + (isToday ? '<span class="today-tag">היום</span>' : "") + "</div>";
-
-  // Overdue undone reminders (only when looking at today).
-  const overdue = isToday ? REMINDERS.filter(r => !r.done && r.date < remDate) : [];
-  if(overdue.length){
-    html += '<div class="rem-sec">⏰ שעבר זמנן</div>';
-    html += remSort(overdue).map(remRow).join("");
+  if(dateInput && !dateInput.value) dateInput.value = todayISO();
+  const open = remSort(REMINDERS.filter(r => !r.done));
+  const doneList = remSort(REMINDERS.filter(r => r.done)).reverse();
+  let html = "";
+  if(open.length){
+    html += open.map(remRow).join("");
+  }else{
+    html += '<div class="rem-empty">אין תזכורות פתוחות — הוסיפו אחת למעלה 🙂</div>';
   }
-
-  const list = REMINDERS.filter(r => r.date === remDate);
-  html += '<div class="rem-sec">🔔 תזכורות ליום הזה</div>';
-  html += list.length ? remSort(list).map(remRow).join("")
-    : '<div class="rem-empty">אין תזכורות ליום הזה — הוסיפו אחת למעלה 🙂</div>';
-
-  // Homework tasks due on this day (from the sheet, read-only here).
-  const due = DATA.tasks.filter(t => t.due_iso === remDate && !t.done);
-  if(due.length){
-    html += '<div class="rem-sec">📚 מטלות שצריכות להסתיים ' + (isToday ? "היום" : "ביום הזה") + "</div>";
-    html += due.map(t => {
-      const kid = KIDS[t.child] || {};
-      return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(t.short || t.title) + "</div>"
-        + '<div class="rem-meta">' + (kid.emoji || "") + " " + (kid.name || "") + (t.subject ? " · " + esc(t.subject) : "") + "</div></div></div>";
-    }).join("");
+  if(doneList.length){
+    html += '<details class="rem-archive"><summary>🗄️ ארכיון (' + doneList.length + ")</summary>"
+      + doneList.map(remRow).join("") + "</details>";
   }
   document.getElementById("remApp").innerHTML = html;
 
@@ -843,7 +846,7 @@ function renderReminders(){
       try{
         const updated = await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/seen", {method: "POST"}, 3);
         const r = REMINDERS.find(x => x.id === id);
-        if(r && updated){ r.seen = updated.seen; r.seenAt = updated.seenAt; }
+        if(r && updated){ r.seen = updated.seen; r.seenAt = updated.seenAt; r.seenBy = updated.seenBy; }
         renderReminders();
       }catch(e){ btn.disabled = false; alert("הסימון לא נשמר — נסו שוב."); }
     });
@@ -852,7 +855,6 @@ function renderReminders(){
     btn.addEventListener("click", () => startEditReminder(btn.dataset.id));
   });
 }
-
 /* ---- feature requests / bug reports (shared, stored in KV via /api/requests) ---- */
 let REQUESTS = [];
 const REQ_STATUS = {open:"פתוח", in_progress:"בטיפול", done:"בוצע", needs_info:"דרוש הבהרה"};
@@ -921,7 +923,6 @@ function fillReminderForm(r){
   document.getElementById("remBy").value = (r.createdBy || "oren");
   document.getElementById("remOwner").value = (r.owner || "oren");
   if(r.date){
-    remDate = r.date;
     const di = document.getElementById("remDate");
     if(di) di.value = r.date;
   }
@@ -949,12 +950,16 @@ async function addReminder(){
   const textEl = document.getElementById("remText");
   const text = (textEl.value || "").trim();
   if(!text){ textEl.focus(); return; }
+  const dateEl = document.getElementById("remDate");
+  const timeEl = document.getElementById("remTime");
+  if(!dateEl.value){ alert("בחרו תאריך סיום."); dateEl.focus(); return; }
+  if(!timeEl.value){ alert("בחרו שעת סיום."); timeEl.focus(); return; }
   const btn = document.getElementById("remAdd");
   btn.disabled = true;
   const payload = {
     text,
-    date: remDate || todayISO(),
-    time: document.getElementById("remTime").value || "",
+    date: dateEl.value,
+    time: timeEl.value,
     child: document.getElementById("remChild").value || "all",
     createdBy: document.getElementById("remBy").value || "oren",
     owner: document.getElementById("remOwner").value || "oren"
@@ -1289,14 +1294,6 @@ document.addEventListener("visibilitychange", () => {
   if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) syncNow();
 });
 
-document.getElementById("remDate").addEventListener("change", (e) => {
-  remDate = e.target.value || todayISO();
-  renderReminders();
-});
-document.getElementById("remToday").addEventListener("click", () => {
-  remDate = todayISO();
-  renderReminders();
-});
 document.getElementById("remAdd").addEventListener("click", addReminder);
 document.getElementById("remCancel").addEventListener("click", cancelEditReminder);
 document.getElementById("remText").addEventListener("keydown", (e) => {

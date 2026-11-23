@@ -88,7 +88,8 @@ function reminderId() {
 }
 const REM_CHILDREN = ['all', 'daniel', 'naya', 'ben', 'alin'];
 const isPerson = (v) => v === 'oren' || v === 'lior';
-// Backward compatibility: old reminders lack createdBy/owner/seen/notified.
+// Backward compatibility: old reminders lack createdBy/owner/seen/seenBy/
+// notified/remindedDay/remindedHour.
 function normReminder(r) {
   return {
     ...r,
@@ -96,7 +97,10 @@ function normReminder(r) {
     owner: isPerson(r.owner) ? r.owner : 'oren',
     seen: !!r.seen,
     seenAt: r.seenAt || null,
+    seenBy: isPerson(r.seenBy) ? r.seenBy : null,
     notified: !!r.notified,
+    remindedDay: !!r.remindedDay,
+    remindedHour: !!r.remindedHour,
   };
 }
 
@@ -156,17 +160,18 @@ export default {
       try { body = await request.json(); } catch { /* ignore */ }
       const text = String(body.text || '').trim().slice(0, 200);
       const date = String(body.date || '');
-      if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        return json({ error: 'text and date (YYYY-MM-DD) are required' }, 400);
+      const time = String(body.time || '');
+      if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+        return json({ error: 'text, date (YYYY-MM-DD) and time (HH:MM) are required' }, 400);
       }
-      const time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? body.time : '';
       const child = REM_CHILDREN.includes(body.child) ? body.child : 'all';
       const createdBy = isPerson(body.createdBy) ? body.createdBy : 'oren';
       const owner = isPerson(body.owner) ? body.owner : 'oren';
       const reminder = {
         id: reminderId(), text, date, time, child, done: false,
         created: new Date().toISOString(),
-        createdBy, owner, seen: false, seenAt: null, notified: false,
+        createdBy, owner, seen: false, seenAt: null, seenBy: null,
+        notified: false, remindedDay: false, remindedHour: false,
       };
       const list = await getReminders(env);
       list.push(reminder);
@@ -206,7 +211,10 @@ export default {
         nr.date = body.date;
       }
       if (body.time !== undefined) {
-        nr.time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? body.time : '';
+        if (!/^\d{2}:\d{2}$/.test(String(body.time || ''))) {
+          return json({ error: 'time must be HH:MM' }, 400);
+        }
+        nr.time = body.time;
       }
       if (body.child !== undefined) {
         if (!REM_CHILDREN.includes(body.child)) {
@@ -218,12 +226,16 @@ export default {
         if (!isPerson(body.owner)) {
           return json({ error: 'owner must be oren|lior' }, 400);
         }
-        // Reassigned to someone else: new owner must be notified + ack.
+        // Reassigned to someone else: new owner must be notified + ack,
+        // and gets fresh day/hour reminders too.
         if (body.owner !== nr.owner) {
           nr.owner = body.owner;
           nr.notified = false;
           nr.seen = false;
           nr.seenAt = null;
+          nr.seenBy = null;
+          nr.remindedDay = false;
+          nr.remindedHour = false;
         }
       }
       Object.assign(r, nr);
@@ -233,12 +245,15 @@ export default {
     const remSeenMatch = path.match(/^\/api\/reminders\/([^/]+)\/seen$/);
     if (remSeenMatch && request.method === 'POST') {
       const id = decodeURIComponent(remSeenMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
       const list = await getReminders(env);
       const r = list.find((x) => x.id === id);
       if (!r) return json({ error: 'not found' }, 404);
       const nr = normReminder(r);
       nr.seen = true;
       nr.seenAt = new Date().toISOString();
+      nr.seenBy = isPerson(body.by) ? body.by : nr.owner;
       Object.assign(r, nr);
       await putReminders(env, list);
       return json(normReminder(r));
@@ -250,11 +265,19 @@ export default {
         return new Response('unauthorized', { status: 401 });
       }
       const id = decodeURIComponent(remNotifyMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const kind = body.kind || 'assigned';
+      if (!['assigned', 'day', 'hour'].includes(kind)) {
+        return json({ error: 'kind must be assigned|day|hour' }, 400);
+      }
       const list = await getReminders(env);
       const r = list.find((x) => x.id === id);
       if (!r) return json({ error: 'not found' }, 404);
       const nr = normReminder(r);
-      nr.notified = true;
+      if (kind === 'assigned') nr.notified = true;
+      else if (kind === 'day') nr.remindedDay = true;
+      else nr.remindedHour = true;
       Object.assign(r, nr);
       await putReminders(env, list);
       return json(normReminder(r));
