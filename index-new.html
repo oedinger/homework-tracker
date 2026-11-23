@@ -225,6 +225,13 @@
   .rem-seen:disabled{opacity:.6}
   .rem-cancel{width:100%; margin-top:8px; border:none; background:none; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; padding:8px}
   .rem-label{font-size:12px; color:var(--muted); font-weight:700; margin:8px 0 2px}
+  .rem-details{margin-top:8px}
+  .rem-details summary{cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); padding:4px 2px}
+  .rem-details textarea{width:100%; box-sizing:border-box; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:10px 12px; font-size:15px; font-family:inherit; margin-top:6px; resize:vertical}
+  .rem-bg{margin-top:6px}
+  .rem-bg summary{cursor:pointer; font-size:13px; font-weight:700; color:var(--muted)}
+  .rem-bg-text{font-size:14px; line-height:1.6; margin-top:4px; white-space:pre-wrap}
+  details:not([open]) > :not(summary){display:none}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
   .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
   .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
@@ -540,6 +547,10 @@
           <option value="lior">אחראי/ת: ליאור</option>
         </select>
       </div>
+      <details class="rem-details" id="remBgDetails" style="margin-top:8px">
+        <summary>פרטים נוספים</summary>
+        <textarea id="remBackground" rows="3" placeholder="רקע למשימה — למשל: מי נפגש, איפה, ומה כבר סוכם" maxlength="1000"></textarea>
+      </details>
       <button class="rem-add" id="remAdd">＋ הוסף תזכורת</button>
       <button class="rem-cancel" id="remCancel" style="display:none">ביטול העריכה</button>
     </div>
@@ -786,13 +797,16 @@ function remRow(r){
   const seenBy = REM_PERSONS[r.seenBy] || (r.seen ? owner : "");
   const seenLine = r.seen
     ? '<div class="rem-seen-line">✓ נצפתה על ידי ' + esc(seenBy) + (r.seenAt ? " · " + shortDate(String(r.seenAt).slice(0, 10)) + " " + String(r.seenAt).slice(11, 16) : "") + "</div>" : "";
+  const bgText = (r.background || "").trim();
+  const bgHtml = bgText
+    ? '<details class="rem-bg"><summary>פרטים נוספים</summary><div class="rem-bg-text">' + esc(bgText).replace(/\n/g, "<br>") + "</div></details>" : "";
   const seenBtn = (!r.done && !r.seen)
     ? '<button class="rem-seen" data-id="' + esc(r.id) + '">👁 ראיתי</button>' : "";
   return '<div class="rem-row' + (r.done ? " done" : "") + (r.seen && !r.done ? " seen" : "") + '">'
     + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
     + '<div class="rem-main"><div class="rem-text">' + esc(r.text)
     + (overdue ? '<span class="due-badge">⏰ באיחור</span>' : "") + "</div>"
-    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + bgHtml + "</div>"
     + '<div class="rem-actions">' + seenBtn
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="ערוך תזכורת" data-edit="1">✏️</button>'
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
@@ -974,6 +988,8 @@ function fillReminderForm(r){
   document.getElementById("remChild").value = (r.child || "all");
   document.getElementById("remBy").value = (r.createdBy || "oren");
   document.getElementById("remOwner").value = (r.owner || "oren");
+  document.getElementById("remBackground").value = r.background || "";
+  document.getElementById("remBgDetails").open = !!(r.background || "").trim();
   if(r.date){
     const di = document.getElementById("remDate");
     if(di) di.value = r.date;
@@ -994,6 +1010,8 @@ function cancelEditReminder(){
   remEditingId = null;
   document.getElementById("remText").value = "";
   document.getElementById("remTime").value = "";
+  document.getElementById("remBackground").value = "";
+  document.getElementById("remBgDetails").open = false;
   document.getElementById("remAdd").textContent = "＋ הוסף תזכורת";
   document.getElementById("remCancel").style.display = "none";
 }
@@ -1014,7 +1032,8 @@ async function addReminder(){
     time: timeEl.value,
     child: document.getElementById("remChild").value || "all",
     createdBy: document.getElementById("remBy").value || "oren",
-    owner: document.getElementById("remOwner").value || "oren"
+    owner: document.getElementById("remOwner").value || "oren",
+    background: (document.getElementById("remBackground").value || "").trim()
   };
   try{
     if(remEditingId){
@@ -1033,6 +1052,8 @@ async function addReminder(){
       if(created.reminder) REMINDERS.push(created.reminder);
       textEl.value = "";
       document.getElementById("remTime").value = "";
+      document.getElementById("remBackground").value = "";
+      document.getElementById("remBgDetails").open = false;
     }
     renderReminders();
   }catch(e){ alert(remEditingId ? "השינויים לא נשמרו — נסו שוב." : "התזכורת לא נשמרה — נסו שוב."); }

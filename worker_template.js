@@ -3,7 +3,7 @@
 //   week:<week name> -> {week, updated, tasks: [...]}
 //   meta             -> {weeks: [...chronological...], current: "<week name>"}
 //   reminders          -> [{id, text, date, time, child, done, created,
-//                           createdBy, owner, seen, seenAt, notified}]
+//                           createdBy, owner, seen, seenAt, notified, background}]
 //     child: "all" | "daniel" | "naya" | "ben" | "alin";
 //     createdBy/owner: "oren" | "lior". Old entries without the new fields
 //     are treated as createdBy=owner="oren", seen=false, notified=false.
@@ -118,6 +118,7 @@ function normReminder(r) {
     notified: !!r.notified,
     remindedDay: !!r.remindedDay,
     remindedHour: !!r.remindedHour,
+    background: typeof r.background === 'string' ? r.background.slice(0, 1000) : '',
   };
 }
 
@@ -184,10 +185,14 @@ export default {
       const child = REM_CHILDREN.includes(body.child) ? body.child : 'all';
       const createdBy = isPerson(body.createdBy) ? body.createdBy : 'oren';
       const owner = isPerson(body.owner) ? body.owner : 'oren';
+      const background = String(body.background ?? '').trim();
+      if (background.length > 1000) {
+        return json({ error: 'background must be at most 1000 chars' }, 400);
+      }
       const reminder = {
         id: reminderId(), text, date, time, child, done: false,
         created: new Date().toISOString(),
-        createdBy, owner, seen: false, seenAt: null, seenBy: null,
+        createdBy, owner, background, seen: false, seenAt: null, seenBy: null,
         notified: false, remindedDay: false, remindedHour: false,
       };
       const list = await getReminders(env);
@@ -238,6 +243,13 @@ export default {
           return json({ error: 'child must be all|daniel|naya|ben|alin' }, 400);
         }
         nr.child = body.child;
+      }
+      if (body.background !== undefined) {
+        const bg = String(body.background ?? '').trim();
+        if (bg.length > 1000) {
+          return json({ error: 'background must be at most 1000 chars' }, 400);
+        }
+        nr.background = bg;
       }
       if (body.owner !== undefined) {
         if (!isPerson(body.owner)) {
