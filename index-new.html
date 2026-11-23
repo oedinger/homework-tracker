@@ -231,6 +231,10 @@
   .due-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:#fee2e2; color:#991b1b; margin-inline-start:6px}
   .rem-archive{margin:16px 4px 0}
   .rem-archive summary{cursor:pointer; font-weight:800; font-size:15px; padding:10px 4px}
+  .rem-filters{margin:12px 4px 2px}
+  .rem-frow{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px}
+  .rem-flabel{font-size:12px; font-weight:700; color:var(--muted); margin-inline-end:2px}
+  .rem-clear{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer}
   /* ---- feature requests ---- */
   .req-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); margin-inline-end:4px}
   .req-badge.st-open{background:#fef3c7; color:#92400e}
@@ -792,14 +796,48 @@ function remRow(r){
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
 }
 
+/* ---- reminders filters (client-side only, reset on reload) ---- */
+let REM_FILTERS = { owner: "all", child: "all", by: "all", state: "all" };
+function remFiltersActive(){
+  return REM_FILTERS.owner !== "all" || REM_FILTERS.child !== "all"
+    || REM_FILTERS.by !== "all" || REM_FILTERS.state !== "all";
+}
+function remIsDueToday(r){
+  return (r.date || "") === todayISO();
+}
+function remMatches(r){
+  if(REM_FILTERS.owner !== "all" && (r.owner || "oren") !== REM_FILTERS.owner) return false;
+  // A reminder for all children matches every child filter.
+  if(REM_FILTERS.child !== "all" && r.child !== REM_FILTERS.child && r.child !== "all") return false;
+  if(REM_FILTERS.by !== "all" && (r.createdBy || "oren") !== REM_FILTERS.by) return false;
+  if(REM_FILTERS.state === "late" && !remIsOverdue(r)) return false;
+  if(REM_FILTERS.state === "today" && !remIsDueToday(r)) return false;
+  return true;
+}
+function remFilterChips(){
+  const rows = [
+    { key: "owner", label: "אחראי/ת:", opts: [["all", "הכל"], ["oren", "אורן"], ["lior", "ליאור"]] },
+    { key: "child", label: "ילד/ה:", opts: [["all", "הכל"], ["daniel", "🔵 דניאל"], ["naya", "🩷 נאיה"], ["ben", "🟢 בן"], ["alin", "🟣 אלין"]] },
+    { key: "by", label: "נוצר/ה על ידי:", opts: [["all", "הכל"], ["oren", "אורן"], ["lior", "ליאור"]] },
+    { key: "state", label: "מצב:", opts: [["all", "הכל"], ["late", "⏰ באיחור"], ["today", "📅 מסתיימות היום"]] }
+  ];
+  return '<div class="rem-filters">' + rows.map(row =>
+    '<div class="rem-frow"><span class="rem-flabel">' + row.label + "</span>" + row.opts.map(o =>
+      '<button class="chip' + (REM_FILTERS[row.key] === o[0] ? " on" : "") + '" data-f="' + row.key + '" data-v="' + o[0] + '">' + o[1] + "</button>").join("") + "</div>").join("") + "</div>";
+}
+
 function renderReminders(){
   const dateInput = document.getElementById("remDate");
   if(dateInput && !dateInput.value) dateInput.value = todayISO();
-  const open = remSort(REMINDERS.filter(r => !r.done));
-  const doneList = remSort(REMINDERS.filter(r => r.done)).reverse();
-  let html = "";
+  const open = remSort(REMINDERS.filter(r => !r.done && remMatches(r)));
+  const doneList = remSort(REMINDERS.filter(r => r.done && remMatches(r))).reverse();
+  let html = remFilterChips();
   if(open.length){
     html += open.map(remRow).join("");
+  }else if(doneList.length){
+    // No open matches, but the archive has matches — show it below.
+  }else if(remFiltersActive()){
+    html += '<div class="rem-empty">אין תזכורות תואמות לסינון<br><button class="rem-clear" id="remClearFilters" style="margin-top:10px">✕ נקה סינון</button></div>';
   }else{
     html += '<div class="rem-empty">אין תזכורות פתוחות — הוסיפו אחת למעלה 🙂</div>';
   }
@@ -808,6 +846,18 @@ function renderReminders(){
       + doneList.map(remRow).join("") + "</details>";
   }
   document.getElementById("remApp").innerHTML = html;
+
+  document.querySelectorAll("#remApp .rem-frow .chip").forEach(b => {
+    b.addEventListener("click", () => {
+      REM_FILTERS[b.dataset.f] = b.dataset.v;
+      renderReminders();
+    });
+  });
+  const clrBtn = document.getElementById("remClearFilters");
+  if(clrBtn) clrBtn.addEventListener("click", () => {
+    REM_FILTERS = { owner: "all", child: "all", by: "all", state: "all" };
+    renderReminders();
+  });
 
   document.querySelectorAll("#remApp .rem-check").forEach(cb => {
     cb.addEventListener("change", async () => {
