@@ -14,6 +14,15 @@
 //                           hash = SHA-256(salt + ":" + password); no plaintext
 //                           passwords anywhere.
 //   session:<token>    -> {username, created, expiresAt} (90-day KV TTL)
+//   sync-request       -> {status: "pending"|"running"|"done",
+//                           requestedBy, requestedAt, startedAt}
+//   sync-status        -> {at, by, triggered: "manual"|"scheduled",
+//                           newTasks, addedSummary, ok}
+//     A manual (on-demand) sync is requested from the site
+//     (POST /api/sync-request, session required); the homework-sync-trigger
+//     cron (every 5 min) claims pending requests and runs the full pipeline
+//     (WebTop + WhatsApp -> sheet -> site), then records the result here.
+//     Scheduled pipeline runs record their result here too (best-effort).
 //     type: "feature" | "bug"; by: "oren" | "lior" (only these two may ask);
 //     status: "open" | "in_progress" | "done" | "needs_info".
 // Legacy key "state" (single-week doc from the first deployment) is merged
@@ -45,6 +54,10 @@
 // POST /api/requests/:id/status (Bearer SYNC_SECRET),
 // DELETE /api/requests/:id (Bearer SYNC_SECRET),
 // POST /api/sync (Bearer SYNC_SECRET — upserts one week, keeps meta current).
+// POST /api/sync-request (session required — queue a manual full-pipeline run),
+// GET /api/sync-status (public — current request + last run),
+// POST /api/sync-request/claim (Bearer SYNC_SECRET — pending -> running),
+// POST /api/sync-status (Bearer SYNC_SECRET — record a run's result).
 //
 // NOTE: D1 was not available — the API token has no D1 scope (401 on every
 // D1 call). KV covers this app fully: small documents, read often, written
@@ -303,6 +316,82 @@ export default {
       users[sess.username] = { salt, hash: await hashPassword(salt, newPassword) };
       await putUsers(env, users);
       return json({ ok: true });
+    }
+
+    // ---- manual sync (on-demand full pipeline run) ----
+    // The site requests a run; the homework-sync-trigger cron claims it
+    // and runs the full pipeline, then records the result. A request
+    // stuck in "running" for >30 min is stale (crashed trigger run) and
+    // may be replaced by a new request or re-claimed.
+    const SYNC_STALE_MS = 30 * 60 * 1000;
+    async function getSyncRequest(env) {
+      return (await env.HOMEWORK_KV.get('sync-request', 'json')) || null;
+    }
+    async function putSyncRequest(env, req) {
+      await env.HOMEWORK_KV.put('sync-request', JSON.stringify(req));
+    }
+    async function getSyncStatus(env) {
+      return (await env.HOMEWORK_KV.get('sync-status', 'json')) || null;
+    }
+    if (path === '/api/sync-request' && request.method === 'POST') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
+      const now = new Date().toISOString();
+      const cur = await getSyncRequest(env);
+      if (cur && cur.status === 'pending') return json({ request: cur });
+      if (cur && cur.status === 'running' && cur.startedAt
+        && Date.now() - Date.parse(cur.startedAt) < SYNC_STALE_MS) {
+        return json({ request: cur });
+      }
+      const req = { status: 'pending', requestedBy: sess.username, requestedAt: now, startedAt: null };
+      await putSyncRequest(env, req);
+      return json({ request: req }, 201);
+    }
+    if (path === '/api/sync-status' && request.method === 'GET') {
+      return json({ request: await getSyncRequest(env), lastRun: await getSyncStatus(env) });
+    }
+    if (path === '/api/sync-request/claim' && request.method === 'POST') {
+      const auth = request.headers.get('Authorization') || '';
+      if (auth !== 'Bearer ' + env.SYNC_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const cur = await getSyncRequest(env);
+      const staleRunning = cur && cur.status === 'running' && cur.startedAt
+        && Date.now() - Date.parse(cur.startedAt) >= SYNC_STALE_MS;
+      if (!cur || (cur.status !== 'pending' && !staleRunning)) {
+        return json({ error: 'not_pending', request: cur }, 409);
+      }
+      const req = { ...cur, status: 'running', startedAt: new Date().toISOString() };
+      await putSyncRequest(env, req);
+      return json({ request: req });
+    }
+    if (path === '/api/sync-status' && request.method === 'POST') {
+      const auth = request.headers.get('Authorization') || '';
+      if (auth !== 'Bearer ' + env.SYNC_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const triggered = body.triggered === 'manual' ? 'manual'
+        : body.triggered === 'scheduled' ? 'scheduled' : '';
+      if (!triggered) return json({ error: 'triggered must be manual|scheduled' }, 400);
+      const newTasks = Number.isInteger(body.newTasks) && body.newTasks >= 0 ? body.newTasks : 0;
+      const lastRun = {
+        at: typeof body.at === 'string' && body.at ? body.at : new Date().toISOString(),
+        by: isPerson(body.by) ? body.by : null,
+        triggered,
+        newTasks,
+        addedSummary: typeof body.addedSummary === 'string' ? body.addedSummary.slice(0, 200) : null,
+        ok: body.ok !== false,
+      };
+      await env.HOMEWORK_KV.put('sync-status', JSON.stringify(lastRun));
+      // A recorded result closes any open manual request so the site
+      // stops polling; a scheduled run with no open request is a no-op.
+      const cur = await getSyncRequest(env);
+      if (cur && (cur.status === 'pending' || cur.status === 'running')) {
+        await putSyncRequest(env, { ...cur, status: 'done' });
+      }
+      return json({ ok: true, lastRun });
     }
 
     if (path === '/api/weeks' && request.method === 'GET') {

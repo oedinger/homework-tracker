@@ -278,8 +278,9 @@
   .req-comment-text{white-space:pre-wrap}
   .req-comment-form{margin-top:8px}
   .req-comment-form textarea{width:100%; box-sizing:border-box; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:8px 10px; font-size:14px; font-family:inherit; resize:vertical}
-  .req-comment-form .rem-form-row{margin-top:6px}
-  .req-comment-send{flex:none; border:none; background:var(--accent); color:#fff; border-radius:999px; padding:9px 14px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap}
+  .req-comment-form .rem-form-row{margin-top:6px; flex-wrap:wrap; align-items:center}
+  .req-comment-form .comment-as{flex:none; white-space:nowrap; overflow-wrap:normal}
+  .req-comment-send{flex:none; border:none; background:var(--accent); color:#fff; border-radius:999px; padding:9px 12px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; align-self:center; max-width:100%; box-sizing:border-box}
   .req-comment-send:disabled{opacity:.6}
 </style>
 </head>
@@ -792,7 +793,7 @@ function remRow(r){
       : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
     + "</div>"
     + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
-    + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י כדי להגיב") + '</span>'
+    + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י") + '</span>'
     + '<button class="req-comment-send" data-rem="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
     + "</details>";
 
@@ -950,7 +951,7 @@ function renderRequests(){
         : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
       + "</div>"
       + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
-      + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י כדי להגיב") + '</span>'
+      + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י") + '</span>'
       + '<button class="req-comment-send" data-req="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
       + "</details>";
     return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
@@ -1144,27 +1145,83 @@ async function addReminder(){
   btn.disabled = false;
 }
 
-/* ---- sync: reload the site's data from the server ---- */
+/* ---- sync: on-demand full pipeline run (WebTop + WhatsApp -> sheet -> site) ----
+   The button requests a run (POST /api/sync-request, session required) and
+   polls GET /api/sync-status until the homework-sync-trigger cron finishes
+   it. reloadData() is the silent reload used on return to the app — it
+   never triggers a pipeline run. */
 function setSyncStatus(msg){ document.getElementById("syncStatus").textContent = msg; }
+const SYNC_POLL_MS = 10000;
+const SYNC_TIMEOUT_MS = 10 * 60 * 1000;
+
+function hhmm(d){
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function syncStatusText(lastRun){
+  if(!lastRun) return "";
+  const d = new Date(lastRun.at);
+  const when = isNaN(d) ? "" : hhmm(d);
+  const kind = lastRun.triggered === "manual" ? "ידני" : "אוטומטי";
+  if(lastRun.ok === false) return "⚠️ הסנכרון האחרון נכשל " + when;
+  const n = lastRun.newTasks || 0;
+  return "סנכרון אחרון: " + when + " (" + kind + ") · " + (n > 0 ? n + " משימות חדשות" : "אין משימות חדשות");
+}
+async function loadSyncStatus(){
+  try{
+    const st = await fetchJSON("/api/sync-status", null, 1);
+    if(st && st.lastRun) setSyncStatus(syncStatusText(st.lastRun));
+    else if(DATA.updated) setSyncStatus("נתוני הגיליון מ־" + formatUpdated(DATA.updated));
+  }catch(e){ /* status line stays as-is */ }
+}
+async function reloadData(){
+  WEEKS = await fetchJSON("/api/weeks");
+  if(viewWeek) await loadWeek(viewWeek);
+  else { DATA = await fetchJSON("/api/tasks"); render(); }
+  await loadReminders();
+  await loadRequests();
+  lastLoadAt = Date.now();
+}
 
 async function syncNow(){
   const btn = document.getElementById("syncBtn");
+  if(!AUTH_USER){ openAuth("login"); alert("עליך להתחבר כדי לסנכרן."); return; }
+  const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = "מסנכרן…";
   try{
-    WEEKS = await fetchJSON("/api/weeks");
-    if(viewWeek) await loadWeek(viewWeek);
-    else { DATA = await fetchJSON("/api/tasks"); render(); }
-    await loadReminders();
-    await loadRequests();
-    lastLoadAt = Date.now();
-    const now = new Date();
-    setSyncStatus("✅ סונכרן " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
-      + (DATA.updated ? " · נתוני הגיליון מ־" + formatUpdated(DATA.updated) : ""));
+    const res = await fetchJSON("/api/sync-request", {method: "POST"});
+    const req = res.request || {};
+    const myAt = req.requestedAt || "";
+    setSyncStatus("🔄 מסנכרן מהוואטסאפ ומוובטופ…");
+    const started = Date.now();
+    let lastRun = null;
+    let done = false;
+    while(Date.now() - started < SYNC_TIMEOUT_MS){
+      await new Promise(r => setTimeout(r, SYNC_POLL_MS));
+      let st;
+      try{ st = await fetchJSON("/api/sync-status", null, 1); }
+      catch(e){ continue; }
+      lastRun = st.lastRun || null;
+      const cur = st.request;
+      if(lastRun && myAt && lastRun.at && lastRun.at >= myAt){ done = true; break; }
+      if(cur && cur.requestedAt === myAt && cur.status === "done"){ done = true; break; }
+      if(!cur){ done = !!lastRun; break; }
+    }
+    await reloadData();
+    await loadSyncStatus();
+    if(done && lastRun){
+      const n = lastRun.newTasks || 0;
+      setSyncStatus("✅ סונכרן " + hhmm(new Date(lastRun.at)) + " · " + (n > 0 ? n + " משימות חדשות" : "אין משימות חדשות"));
+    }else if(done){
+      setSyncStatus("✅ סונכרן " + hhmm(new Date()));
+    }else{
+      setSyncStatus("⏳ הסנכרון עדיין רץ ברקע — יתעדכן אוטומטית");
+    }
   }catch(e){
-    setSyncStatus("⚠️ הסנכרון נכשל — נסו שוב");
+    if(e.loginRequired){ openAuth("login"); alert("עליך להתחבר כדי לסנכרן."); }
+    else setSyncStatus("⚠️ הסנכרון נכשל — נסו שוב");
   }
-  btn.textContent = "🔄 סנכרן";
+  btn.textContent = label;
   btn.disabled = false;
 }
 
@@ -1403,6 +1460,7 @@ async function load(){
     lastLoadAt = Date.now();
     await loadReminders();
     await loadRequests();
+    await loadSyncStatus();
   }catch(e){
     document.getElementById("err").style.display = "block";
   }
@@ -1443,8 +1501,9 @@ document.getElementById("designToggle").addEventListener("click", () => {
   location.href = u.toString();
 });
 document.addEventListener("visibilitychange", () => {
-  // Coming back to the app after a while: refresh silently.
-  if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) syncNow();
+  // Coming back to the app after a while: refresh silently (reload only —
+  // never triggers a pipeline run).
+  if(!document.hidden && lastLoadAt && Date.now() - lastLoadAt > 5 * 60 * 1000) reloadData().catch(() => {});
 });
 
 document.getElementById("remAdd").addEventListener("click", addReminder);
