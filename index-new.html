@@ -25,7 +25,7 @@
   header{margin:4px 4px 12px}
   h1{font-size:28px; margin:0 0 4px}
   .sub{color:var(--muted); font-size:14px}
-  .syncrow{display:flex; align-items:center; gap:10px; margin:12px 4px 0}
+  .syncrow{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 4px 0}
   .syncbtn{
     flex:none; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
     border-radius:999px; padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer;
@@ -232,6 +232,21 @@
   .rem-bg summary{cursor:pointer; font-size:13px; font-weight:700; color:var(--muted)}
   .rem-bg-text{font-size:14px; line-height:1.6; margin-top:4px; white-space:pre-wrap}
   details:not([open]) > :not(summary){display:none}
+  .authbox{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .authbtn{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}
+  .authwho{font-size:13px;font-weight:700;color:var(--muted)}
+  .auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;box-sizing:border-box}
+  .auth-card{background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:340px;box-sizing:border-box;box-shadow:0 10px 30px rgba(0,0,0,.25);color:var(--ink)}
+  .auth-card h3{margin:0 0 12px;font-size:18px}
+  .auth-card label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:10px}
+  .auth-card input,.auth-card select{width:100%;box-sizing:border-box;border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;font-size:15px;font-family:inherit;margin-top:4px;background:#fff;color:var(--ink)}
+  .auth-err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+  .auth-card .rem-add{width:100%;margin-top:4px}
+  .auth-link{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:6px 0;text-decoration:underline;font-family:inherit}
+  .login-prompt{background:var(--card);border:1.5px dashed var(--line);border-radius:14px;padding:14px;text-align:center;font-size:14px;color:var(--muted);margin-bottom:10px}
+  .login-prompt .authbtn{margin-top:8px}
+  .creator-note{font-size:13px;color:var(--muted);font-weight:700;align-self:center}
+  .comment-as{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
   .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
   .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
@@ -482,6 +497,7 @@
     <span class="syncstatus" id="syncStatus" role="status"></span>
     <button class="syncbtn" id="syncBtn">↻ סנכרן</button>
     <button class="syncbtn" id="designToggle">↩ עיצוב קלאסי</button>
+    <span class="authbox" id="authBox"></span>
   </div>
   <nav class="tabs" aria-label="תצוגת היומן">
     <button class="tab on" aria-pressed="true" data-tab="homework"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></svg>שיעורי בית</button>
@@ -531,7 +547,8 @@
 
   <div id="remindersView" style="display:none">
     <h2 class="page-heading">תזכורות משפחתיות</h2>
-    <div class="rem-form">
+    <div class="login-prompt" id="remLoginPrompt" style="display:none">עליך להתחבר כדי להוסיף תזכורת.<br><button class="authbtn" id="remLoginBtn" type="button">התחבר</button></div>
+    <div class="rem-form" id="remFormWrap">
       <label class="form-title" for="remText">תזכורת חדשה</label>
       <input type="text" id="remText" placeholder="מה להזכיר? למשל: להביא חולצת ספורט" maxlength="200">
       <div class="rem-label">תאריך ושעת סיום *</div>
@@ -549,10 +566,7 @@
         </select>
       </div>
       <div class="rem-form-row" style="margin-top:8px">
-        <select id="remBy" aria-label="מי מוסיף/ה">
-          <option value="oren">מוסיף/ה: אורן</option>
-          <option value="lior">מוסיף/ה: ליאור</option>
-        </select>
+        <span class="creator-note" id="remCreatorNote"></span>
         <select id="remOwner" aria-label="מי אחראי/ת">
           <option value="oren">אחראי/ת: אורן</option>
           <option value="lior">אחראי/ת: ליאור</option>
@@ -571,17 +585,15 @@
 
   <div id="requestsView" style="display:none">
     <h2 class="page-heading">בקשות ושיפורים</h2>
-    <div class="rem-form">
+    <div class="login-prompt" id="reqLoginPrompt" style="display:none">עליך להתחבר כדי לשלוח בקשה.<br><button class="authbtn" id="reqLoginBtn" type="button">התחבר</button></div>
+    <div class="rem-form" id="reqFormWrap">
       <input type="text" id="reqText" placeholder="מה להוסיף או לתקן? למשל: כפתור סינון לפי שבוע" maxlength="500">
       <div class="rem-form-row">
         <select id="reqType" aria-label="סוג הבקשה">
           <option value="feature">✨ פיצ'ר חדש</option>
           <option value="bug">🐛 תיקון באג</option>
         </select>
-        <select id="reqBy" aria-label="מי מבקש/ת">
-          <option value="oren">אורן</option>
-          <option value="lior">ליאור</option>
-        </select>
+        <span class="creator-note" id="reqCreatorNote"></span>
       </div>
       <button class="rem-add" id="reqAdd">＋ שלח בקשה</button>
     </div>
@@ -595,6 +607,7 @@
   </footer>
 </div>
 
+<div id="authModalRoot"></div>
 <script>
 document.getElementById("todayDate").textContent = new Intl.DateTimeFormat("he-IL", {
   weekday: "long", day: "numeric", month: "long"
@@ -612,6 +625,179 @@ let childFilter = "all";
 /* ---- reminders (shared, stored in KV via /api/reminders) ---- */
 let REMINDERS = [];
 let lastLoadAt = 0;
+
+/* ---- identity / login (session token in localStorage, 90 days) ---- */
+const AUTH_TOKEN_KEY = "hw_session";
+const PERSON_NAMES = { oren: "אורן", lior: "ליאור" };
+let AUTH_USER = null;
+let AUTH_STATUS = { oren: false, lior: false };
+function authToken(){ try{ return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }catch(e){ return ""; } }
+function authHeaders(extra){
+  const h = Object.assign({}, extra || {});
+  const t = authToken();
+  if(t) h["Authorization"] = "Bearer " + t;
+  return h;
+}
+function otherPerson(u){ return u === "oren" ? "lior" : "oren"; }
+function resetReminderOwnerDefault(){
+  if(!AUTH_USER) return;
+  const ownerSel = document.getElementById("remOwner");
+  if(ownerSel) ownerSel.value = otherPerson(AUTH_USER);
+}
+function applyIdentity(){
+  renderAuthBox();
+  const remNote = document.getElementById("remCreatorNote");
+  if(remNote) remNote.textContent = AUTH_USER ? "יוצר/ת: " + PERSON_NAMES[AUTH_USER] + " (את/ה)" : "";
+  const reqNote = document.getElementById("reqCreatorNote");
+  if(reqNote) reqNote.textContent = AUTH_USER ? "מבקש/ת: " + PERSON_NAMES[AUTH_USER] + " (את/ה)" : "";
+  const remForm = document.getElementById("remFormWrap");
+  const remPrompt = document.getElementById("remLoginPrompt");
+  if(remForm && remPrompt){
+    remForm.style.display = AUTH_USER ? "" : "none";
+    remPrompt.style.display = AUTH_USER ? "none" : "";
+  }
+  const reqForm = document.getElementById("reqFormWrap");
+  const reqPrompt = document.getElementById("reqLoginPrompt");
+  if(reqForm && reqPrompt){
+    reqForm.style.display = AUTH_USER ? "" : "none";
+    reqPrompt.style.display = AUTH_USER ? "none" : "";
+  }
+  if(AUTH_USER && !remEditingId) resetReminderOwnerDefault();
+  if(activeTab === "reminders") renderReminders();
+  if(activeTab === "requests") renderRequests();
+}
+function renderAuthBox(){
+  const box = document.getElementById("authBox");
+  if(!box) return;
+  if(AUTH_USER){
+    box.innerHTML = '<span class="authwho">מחובר כ־' + PERSON_NAMES[AUTH_USER] + '</span>'
+      + '<button class="authbtn" id="authChangeBtn" type="button">שינוי סיסמה</button>'
+      + '<button class="authbtn" id="authLogoutBtn" type="button">התנתק</button>';
+    document.getElementById("authLogoutBtn").addEventListener("click", async () => {
+      try{ await fetchJSON("/api/auth/logout", {method: "POST"}); }catch(e){}
+      clearSession();
+    });
+    document.getElementById("authChangeBtn").addEventListener("click", () => openAuth("change"));
+  }else{
+    box.innerHTML = '<button class="authbtn" id="authLoginBtn" type="button">התחבר</button>';
+    document.getElementById("authLoginBtn").addEventListener("click", () => openAuth("login"));
+  }
+}
+function saveSession(token, username){
+  try{ localStorage.setItem(AUTH_TOKEN_KEY, token); }catch(e){}
+  AUTH_USER = username;
+  applyIdentity();
+}
+function clearSession(){
+  try{ localStorage.removeItem(AUTH_TOKEN_KEY); }catch(e){}
+  AUTH_USER = null;
+  applyIdentity();
+}
+async function refreshAuth(){
+  try{
+    const status = await fetchJSON("/api/auth/status");
+    if(status && status.users) AUTH_STATUS = status.users;
+  }catch(e){ /* status stays as-is */ }
+  const token = authToken();
+  if(!token){ AUTH_USER = null; applyIdentity(); return; }
+  try{
+    const me = await fetchJSON("/api/auth/me");
+    AUTH_USER = me.username;
+  }catch(e){
+    try{ localStorage.removeItem(AUTH_TOKEN_KEY); }catch(_){}
+    AUTH_USER = null;
+  }
+  applyIdentity();
+}
+let authMode = "login";
+function openAuth(mode, presetUser){
+  authMode = mode || "login";
+  const root = document.getElementById("authModalRoot");
+  if(!root) return;
+  const isSetup = authMode === "setup";
+  const isChange = authMode === "change";
+  const title = isSetup ? "קביעת סיסמה (פעם ראשונה)" : isChange ? "שינוי סיסמה" : "התחברות";
+  const selUser = presetUser || AUTH_USER || "oren";
+  const userOpts = ["oren", "lior"].map(u =>
+    '<option value="' + u + '"' + (selUser === u ? " selected" : "") + ">" + PERSON_NAMES[u] + "</option>").join("");
+  root.innerHTML = '<div class="auth-modal" id="authModal"><div class="auth-card">'
+    + "<h3>" + title + "</h3>"
+    + '<div class="auth-err" id="authErr" style="display:none"></div>'
+    + (isChange ? "" : '<label>מי את/ה?<select id="authUser">' + userOpts + "</select></label>")
+    + (isChange
+      ? '<label>סיסמה נוכחית<input type="password" id="authOldPw" autocomplete="current-password"></label>'
+        + '<label>סיסמה חדשה (לפחות 4 תווים)<input type="password" id="authNewPw" autocomplete="new-password"></label>'
+      : '<label>סיסמה<input type="password" id="authPw" autocomplete="current-password"></label>'
+        + (isSetup ? '<label>אימות סיסמה<input type="password" id="authPw2" autocomplete="new-password"></label>' : ""))
+    + '<button class="rem-add" id="authSubmit">' + (isSetup ? "קבע סיסמה" : isChange ? "שנה סיסמה" : "התחבר") + "</button>"
+    + '<button class="auth-link" id="authCancel" type="button">ביטול</button>'
+    + "</div></div>";
+  document.getElementById("authCancel").addEventListener("click", closeAuth);
+  document.getElementById("authModal").addEventListener("click", (e) => { if(e.target.id === "authModal") closeAuth(); });
+  document.getElementById("authSubmit").addEventListener("click", submitAuth);
+  const pwInput = document.getElementById("authPw") || document.getElementById("authOldPw");
+  if(pwInput) pwInput.focus();
+}
+function closeAuth(){
+  const root = document.getElementById("authModalRoot");
+  if(root) root.innerHTML = "";
+}
+function authError(msg){
+  const el = document.getElementById("authErr");
+  if(el){ el.textContent = msg; el.style.display = ""; }
+}
+async function submitAuth(){
+  const isSetup = authMode === "setup";
+  const isChange = authMode === "change";
+  const btn = document.getElementById("authSubmit");
+  if(!btn) return;
+  btn.disabled = true;
+  try{
+    if(isChange){
+      const oldPw = document.getElementById("authOldPw").value;
+      const newPw = document.getElementById("authNewPw").value;
+      if(newPw.length < 4){ authError("הסיסמה החדשה חייבת להיות לפחות 4 תווים."); btn.disabled = false; return; }
+      await fetchJSON("/api/auth/change-password", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw })
+      });
+      closeAuth();
+      alert("הסיסמה שונתה.");
+      return;
+    }
+    const username = document.getElementById("authUser").value;
+    const pw = document.getElementById("authPw").value;
+    if(isSetup){
+      const pw2 = document.getElementById("authPw2").value;
+      if(pw.length < 4){ authError("הסיסמה חייבת להיות לפחות 4 תווים."); btn.disabled = false; return; }
+      if(pw !== pw2){ authError("הסיסמאות לא תואמות."); btn.disabled = false; return; }
+      const res = await fetchJSON("/api/auth/setup", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ username, password: pw })
+      });
+      saveSession(res.token, res.username);
+      closeAuth();
+      return;
+    }
+    let res;
+    try{
+      res = await fetchJSON("/api/auth/login", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ username, password: pw })
+      });
+    }catch(e){
+      // Account without a password yet: go to first-time setup.
+      if(e.status === 409){ openAuth("setup", username); return; }
+      throw e;
+    }
+    saveSession(res.token, res.username);
+    closeAuth();
+  }catch(e){
+    authError(e.status === 401 && isChange ? "ההתחברות פגה — התחברו שוב."
+      : e.status === 401 ? "סיסמה שגויה — נסו שוב." : "ההתחברות נכשלה — נסו שוב.");
+  }
+  btn.disabled = false;
+}
 
 /* ---- weekly timetable (static reference data, updated 17/11/2026) ----
    Sources: Daniel g3 PDF (Lior, 11/9) · Naya a2 PDF (Moran, 4/11) ·
@@ -826,7 +1012,7 @@ function remRow(r){
       : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
     + "</div>"
     + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
-    + '<div class="rem-form-row"><select aria-label="מי מגיב/ה"><option value="oren">מגיב/ה: אורן</option><option value="lior">מגיב/ה: ליאור</option></select>'
+    + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י כדי להגיב") + '</span>'
     + '<button class="req-comment-send" data-rem="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
     + "</details>";
 
@@ -984,7 +1170,7 @@ function renderRequests(){
         : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
       + "</div>"
       + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
-      + '<div class="rem-form-row"><select aria-label="מי מגיב/ה"><option value="oren">מגיב/ה: אורן</option><option value="lior">מגיב/ה: ליאור</option></select>'
+      + '<div class="rem-form-row"><span class="comment-as">מגיב/ה: ' + (AUTH_USER ? PERSON_NAMES[AUTH_USER] : "— התחבר/י כדי להגיב") + '</span>'
       + '<button class="req-comment-send" data-req="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
       + "</details>";
     return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
@@ -1005,15 +1191,15 @@ async function addRequestComment(id){
   const det = document.querySelector('details.req-thread[data-req="' + id + '"]');
   if(!det) return;
   const ta = det.querySelector("textarea");
-  const sel = det.querySelector("select");
   const text = (ta.value || "").trim();
   if(!text){ ta.focus(); return; }
+  if(!AUTH_USER){ openAuth("login"); return; }
   const btn = det.querySelector(".req-comment-send");
   btn.disabled = true;
   try{
     const res = await fetchJSON("/api/requests/" + encodeURIComponent(id) + "/comments", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ text, by: sel.value })
+      body: JSON.stringify({ text })
     }, 3);
     const r = REQUESTS.find(x => x.id === id);
     if(r){
@@ -1031,15 +1217,15 @@ async function addReminderComment(id){
   const det = document.querySelector('details.req-thread[data-rem="' + id + '"]');
   if(!det) return;
   const ta = det.querySelector("textarea");
-  const sel = det.querySelector("select");
   const text = (ta.value || "").trim();
   if(!text){ ta.focus(); return; }
+  if(!AUTH_USER){ openAuth("login"); return; }
   const btn = det.querySelector(".req-comment-send");
   btn.disabled = true;
   try{
     const res = await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/comments", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ text, by: sel.value })
+      body: JSON.stringify({ text })
     }, 3);
     const r = REMINDERS.find(x => x.id === id);
     if(r){
@@ -1061,6 +1247,7 @@ async function loadRequests(){
 }
 
 async function addRequest(){
+  if(!AUTH_USER){ openAuth("login"); return; }
   const textEl = document.getElementById("reqText");
   const text = (textEl.value || "").trim();
   if(!text){ textEl.focus(); return; }
@@ -1071,14 +1258,16 @@ async function addRequest(){
       method: "POST", headers: {"Content-Type":"application/json"},
       body: JSON.stringify({
         text,
-        type: document.getElementById("reqType").value,
-        by: document.getElementById("reqBy").value
+        type: document.getElementById("reqType").value
       })
     }, 3);
     REQUESTS.unshift(created.request);
     textEl.value = "";
     renderRequests();
-  }catch(e){ alert("הבקשה לא נשלחה — נסו שוב."); }
+  }catch(e){
+    if(e.loginRequired){ openAuth("login"); alert("עליך להתחבר כדי לשלוח בקשה."); }
+    else alert("הבקשה לא נשלחה — נסו שוב.");
+  }
   btn.disabled = false;
 }
 
@@ -1096,7 +1285,6 @@ function fillReminderForm(r){
   document.getElementById("remText").value = r.text || "";
   document.getElementById("remTime").value = r.time || "";
   document.getElementById("remChild").value = (r.child || "all");
-  document.getElementById("remBy").value = (r.createdBy || "oren");
   document.getElementById("remOwner").value = (r.owner || "oren");
   document.getElementById("remBackground").value = r.background || "";
   document.getElementById("remBgDetails").open = !!(r.background || "").trim();
@@ -1107,6 +1295,7 @@ function fillReminderForm(r){
 }
 
 function startEditReminder(id){
+  if(!AUTH_USER){ openAuth("login"); return; }
   const r = REMINDERS.find(x => x.id === id);
   if(!r) return;
   remEditingId = id;
@@ -1124,9 +1313,11 @@ function cancelEditReminder(){
   document.getElementById("remBgDetails").open = false;
   document.getElementById("remAdd").textContent = "＋ הוסף תזכורת";
   document.getElementById("remCancel").style.display = "none";
+  resetReminderOwnerDefault();
 }
 
 async function addReminder(){
+  if(!AUTH_USER){ openAuth("login"); return; }
   const textEl = document.getElementById("remText");
   const text = (textEl.value || "").trim();
   if(!text){ textEl.focus(); return; }
@@ -1141,7 +1332,6 @@ async function addReminder(){
     date: dateEl.value,
     time: timeEl.value,
     child: document.getElementById("remChild").value || "all",
-    createdBy: document.getElementById("remBy").value || "oren",
     owner: document.getElementById("remOwner").value || "oren",
     background: (document.getElementById("remBackground").value || "").trim()
   };
@@ -1164,9 +1354,13 @@ async function addReminder(){
       document.getElementById("remTime").value = "";
       document.getElementById("remBackground").value = "";
       document.getElementById("remBgDetails").open = false;
+      resetReminderOwnerDefault();
     }
     renderReminders();
-  }catch(e){ alert(remEditingId ? "השינויים לא נשמרו — נסו שוב." : "התזכורת לא נשמרה — נסו שוב."); }
+  }catch(e){
+    if(e.loginRequired){ openAuth("login"); alert("עליך להתחבר כדי לשמור תזכורת."); }
+    else alert(remEditingId ? "השינויים לא נשמרו — נסו שוב." : "התזכורת לא נשמרה — נסו שוב.");
+  }
   btn.disabled = false;
 }
 
@@ -1403,10 +1597,21 @@ async function fetchJSON(url, opts, attempts){
   let delay = 300;
   for(let i = 0; i < attempts; i++){
     try{
-      const r = await fetch(url, opts);
-      if(!r.ok) throw new Error("http " + r.status);
+      const o = Object.assign({}, opts);
+      // The session token (when present) rides on every API call: reads
+      // ignore it, writes enforce it, "seen" uses it for seenBy.
+      o.headers = authHeaders(o.headers);
+      const r = await fetch(url, o);
+      if(!r.ok){
+        const e = new Error("http " + r.status);
+        e.status = r.status;
+        if(r.status === 401) e.loginRequired = true;
+        throw e;
+      }
       return await r.json();
     }catch(e){
+      // Client errors (4xx) are final — retrying won't help.
+      if(e.status && e.status < 500) throw e;
       if(i === attempts - 1) throw e;
       await new Promise(res => setTimeout(res, delay));
       delay = Math.min(delay * 2, 3000);
@@ -1426,6 +1631,7 @@ async function loadWeek(week){
 }
 
 async function load(){
+  await refreshAuth();
   try{
     WEEKS = await fetchJSON("/api/weeks");
     viewWeek = WEEKS.current || "";
@@ -1478,6 +1684,8 @@ document.addEventListener("visibilitychange", () => {
 });
 
 document.getElementById("remAdd").addEventListener("click", addReminder);
+document.getElementById("remLoginBtn").addEventListener("click", () => openAuth("login"));
+document.getElementById("reqLoginBtn").addEventListener("click", () => openAuth("login"));
 document.getElementById("remCancel").addEventListener("click", cancelEditReminder);
 document.getElementById("remText").addEventListener("keydown", (e) => {
   if(e.key === "Enter") addReminder();

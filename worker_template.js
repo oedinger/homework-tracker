@@ -10,6 +10,10 @@
 //     are treated as createdBy=owner="oren", seen=false, notified=false.
 //   feature-requests   -> [{id, type, text, by, status, created, updated,
 //                              comments: [{id, by, text, created}]}]
+//   users              -> {oren: {salt, hash}, lior: {salt, hash}}
+//                           hash = SHA-256(salt + ":" + password); no plaintext
+//                           passwords anywhere.
+//   session:<token>    -> {username, created, expiresAt} (90-day KV TTL)
 //     type: "feature" | "bug"; by: "oren" | "lior" (only these two may ask);
 //     status: "open" | "in_progress" | "done" | "needs_info".
 // Legacy key "state" (single-week doc from the first deployment) is merged
@@ -30,6 +34,12 @@
 // POST /api/reminders/:id/notify (Bearer SYNC_SECRET),
 // POST /api/reminders/:id/comments,
 // DELETE /api/reminders/:id,
+// GET /api/auth/status, POST /api/auth/setup, POST /api/auth/login,
+// GET /api/auth/me, POST /api/auth/logout, POST /api/auth/change-password.
+// Identity: reads stay open; writes (reminders, requests, comments, PATCH)
+// require a valid session, and the session user is authoritative for
+// createdBy/by. The sync bearer still guards /api/sync, /notify and
+// request status/delete.
 // GET /api/requests, POST /api/requests,
 // POST /api/requests/:id/comments,
 // POST /api/requests/:id/status (Bearer SYNC_SECRET),
@@ -112,6 +122,57 @@ function remCommentId() {
 }
 const REM_CHILDREN = ['all', 'daniel', 'naya', 'ben', 'alin'];
 const isPerson = (v) => v === 'oren' || v === 'lior';
+const otherPerson = (u) => (u === 'oren' ? 'lior' : 'oren');
+
+// ---- identity / login (KV keys "users" and "session:<token>") ----
+const SESSION_TTL_SECONDS = 90 * 24 * 3600;
+async function getUsers(env) {
+  return (await env.HOMEWORK_KV.get('users', 'json')) || {};
+}
+async function putUsers(env, users) {
+  await env.HOMEWORK_KV.put('users', JSON.stringify(users));
+}
+function hexBuf(buf) {
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function hashPassword(salt, password) {
+  const data = new TextEncoder().encode(salt + ':' + password);
+  return hexBuf(await crypto.subtle.digest('SHA-256', data));
+}
+function newSalt() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return hexBuf(bytes);
+}
+async function createSession(env, username) {
+  const token = crypto.randomUUID();
+  const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
+  await env.HOMEWORK_KV.put(
+    'session:' + token,
+    JSON.stringify({ username, created: new Date().toISOString(), expiresAt }),
+    { expirationTtl: SESSION_TTL_SECONDS },
+  );
+  return { token, username, expiresAt };
+}
+// Returns {token, username} or null. The sync bearer is NOT a session
+// (it never lives under "session:"), so cron auth is unaffected.
+async function getSession(env, request) {
+  const auth = request.headers.get('Authorization') || '';
+  const m = auth.match(/^Bearer\s+(.+)$/);
+  if (!m) return null;
+  const token = m[1].trim();
+  if (!token || token.length > 200) return null;
+  const sess = await env.HOMEWORK_KV.get('session:' + token, 'json');
+  if (!sess || !isPerson(sess.username)) return null;
+  if (sess.expiresAt && Date.now() > sess.expiresAt) {
+    await env.HOMEWORK_KV.delete('session:' + token);
+    return null;
+  }
+  return { token, username: sess.username };
+}
+async function requireSession(env, request) {
+  return getSession(env, request);
+}
 // Backward compatibility: old reminders lack createdBy/owner/seen/seenBy/
 // notified/remindedDay/remindedHour.
 function normReminder(r) {
@@ -177,6 +238,73 @@ export default {
     }
     if (path === '/health') return json({ ok: true });
 
+    // ---- identity / login ----
+    if (path === '/api/auth/status' && request.method === 'GET') {
+      const users = await getUsers(env);
+      return json({ users: { oren: !!users.oren, lior: !!users.lior } });
+    }
+    if (path === '/api/auth/setup' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const username = body.username;
+      const password = String(body.password || '');
+      if (!isPerson(username)) return json({ error: 'username must be oren|lior' }, 400);
+      if (password.length < 4) return json({ error: 'password must be at least 4 chars' }, 400);
+      const users = await getUsers(env);
+      if (users[username]) return json({ error: 'password already set' }, 403);
+      const salt = newSalt();
+      users[username] = { salt, hash: await hashPassword(salt, password) };
+      await putUsers(env, users);
+      // First login is part of setup: return a session right away.
+      const sess = await createSession(env, username);
+      return json({ ok: true, ...sess }, 201);
+    }
+    if (path === '/api/auth/login' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const username = body.username;
+      const password = String(body.password || '');
+      if (!isPerson(username)) return json({ error: 'unknown user' }, 401);
+      const users = await getUsers(env);
+      const rec = users[username];
+      if (!rec) return json({ error: 'no_password' }, 409);
+      if ((await hashPassword(rec.salt, password)) !== rec.hash) {
+        return json({ error: 'wrong password' }, 401);
+      }
+      return json(await createSession(env, username));
+    }
+    if (path === '/api/auth/me' && request.method === 'GET') {
+      const sess = await getSession(env, request);
+      if (!sess) return json({ error: 'not logged in' }, 401);
+      return json({ username: sess.username });
+    }
+    if (path === '/api/auth/logout' && request.method === 'POST') {
+      const sess = await getSession(env, request);
+      if (sess) await env.HOMEWORK_KV.delete('session:' + sess.token);
+      return json({ ok: true });
+    }
+    if (path === '/api/auth/change-password' && request.method === 'POST') {
+      const sess = await getSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const oldPassword = String(body.oldPassword || '');
+      const newPassword = String(body.newPassword || '');
+      if (newPassword.length < 4) {
+        return json({ error: 'new password must be at least 4 chars' }, 400);
+      }
+      const users = await getUsers(env);
+      const rec = users[sess.username];
+      if (!rec) return json({ error: 'no password set' }, 409);
+      if ((await hashPassword(rec.salt, oldPassword)) !== rec.hash) {
+        return json({ error: 'wrong password' }, 401);
+      }
+      const salt = newSalt();
+      users[sess.username] = { salt, hash: await hashPassword(salt, newPassword) };
+      await putUsers(env, users);
+      return json({ ok: true });
+    }
+
     if (path === '/api/weeks' && request.method === 'GET') {
       return json(await getMeta(env));
     }
@@ -206,6 +334,8 @@ export default {
       return json({ reminders: (await getReminders(env)).map(normReminder) });
     }
     if (path === '/api/reminders' && request.method === 'POST') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
       let body = {};
       try { body = await request.json(); } catch { /* ignore */ }
       const text = String(body.text || '').trim().slice(0, 200);
@@ -215,8 +345,10 @@ export default {
         return json({ error: 'text, date (YYYY-MM-DD) and time (HH:MM) are required' }, 400);
       }
       const child = REM_CHILDREN.includes(body.child) ? body.child : 'all';
-      const createdBy = isPerson(body.createdBy) ? body.createdBy : 'oren';
-      const owner = isPerson(body.owner) ? body.owner : 'oren';
+      // The creator is the logged-in user (client-supplied createdBy is
+      // ignored); the owner defaults to the other parent unless given.
+      const createdBy = sess.username;
+      const owner = isPerson(body.owner) ? body.owner : otherPerson(sess.username);
       const background = String(body.background ?? '').trim();
       if (background.length > 1000) {
         return json({ error: 'background must be at most 1000 chars' }, 400);
@@ -247,6 +379,8 @@ export default {
     }
     const remPatchMatch = path.match(/^\/api\/reminders\/([^/]+)$/);
     if (remPatchMatch && request.method === 'PATCH') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
       const id = decodeURIComponent(remPatchMatch[1]);
       let body = {};
       try { body = await request.json(); } catch { /* ignore */ }
@@ -315,7 +449,10 @@ export default {
       const nr = normReminder(r);
       nr.seen = true;
       nr.seenAt = new Date().toISOString();
-      nr.seenBy = isPerson(body.by) ? body.by : nr.owner;
+      // A valid session identifies the viewer; otherwise fall back to the
+      // old behaviour (explicit `by`, else the reminder's owner).
+      const sess = await getSession(env, request);
+      nr.seenBy = sess ? sess.username : (isPerson(body.by) ? body.by : nr.owner);
       Object.assign(r, nr);
       await putReminders(env, list);
       return json(normReminder(r));
@@ -346,14 +483,16 @@ export default {
     }
     const remCommentMatch = path.match(/^\/api\/reminders\/([^/]+)\/comments$/);
     if (remCommentMatch && request.method === 'POST') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
       const id = decodeURIComponent(remCommentMatch[1]);
       let body = {};
       try { body = await request.json(); } catch { /* ignore */ }
-      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
       const text = String(body.text || '').trim();
-      if (!by || !text || text.length > 500) {
-        return json({ error: 'by (oren|lior) and text (1-500 chars) are required' }, 400);
+      if (!text || text.length > 500) {
+        return json({ error: 'text (1-500 chars) is required' }, 400);
       }
+      const by = sess.username;
       const list = await getReminders(env);
       const r = list.find((x) => x.id === id);
       if (!r) return json({ error: 'not found' }, 404);
@@ -375,20 +514,22 @@ export default {
     }
 
     // ---- feature requests / bug reports (KV key "feature-requests") ----
-    // Only Oren and Lior may ask (enforced via `by` validation — there is
-    // no login; the site is not publicized). Status changes and deletes
+    // Only Oren and Lior may ask: creation requires a valid session and
+    // the author is the logged-in user. Status changes and deletes
     // require the sync bearer secret, same as /api/sync.
     if (path === '/api/requests' && request.method === 'GET') {
       return json({ requests: (await getRequests(env)).map(normRequest) });
     }
     if (path === '/api/requests' && request.method === 'POST') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
       let body = {};
       try { body = await request.json(); } catch { /* ignore */ }
       const type = body.type === 'bug' ? 'bug' : body.type === 'feature' ? 'feature' : '';
       const text = String(body.text || '').trim().slice(0, 500);
-      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
-      if (!type || !text || !by) {
-        return json({ error: 'type (feature|bug), text (1-500 chars) and by (oren|lior) are required' }, 400);
+      const by = sess.username;
+      if (!type || !text) {
+        return json({ error: 'type (feature|bug) and text (1-500 chars) are required' }, 400);
       }
       const now = new Date().toISOString();
       const req = {
@@ -402,14 +543,16 @@ export default {
     }
     const reqCommentMatch = path.match(/^\/api\/requests\/([^/]+)\/comments$/);
     if (reqCommentMatch && request.method === 'POST') {
+      const sess = await requireSession(env, request);
+      if (!sess) return json({ error: 'login_required' }, 401);
       const id = decodeURIComponent(reqCommentMatch[1]);
       let body = {};
       try { body = await request.json(); } catch { /* ignore */ }
-      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
       const text = String(body.text || '').trim();
-      if (!by || !text || text.length > 500) {
-        return json({ error: 'by (oren|lior) and text (1-500 chars) are required' }, 400);
+      if (!text || text.length > 500) {
+        return json({ error: 'text (1-500 chars) is required' }, 400);
       }
+      const by = sess.username;
       const list = await getRequests(env);
       const r = list.find((x) => x.id === id);
       if (!r) return json({ error: 'not found' }, 404);
