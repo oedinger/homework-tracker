@@ -576,6 +576,8 @@ const REM_KIDS = {
 };
 const REM_PERSONS = { oren: "אורן", lior: "ליאור" };
 
+let remOpenThreads = {};
+let remArchiveOpen = false;
 function remRow(r){
   const kid = r.child && REM_KIDS[r.child] ? REM_KIDS[r.child].emoji + " " + REM_KIDS[r.child].name : "כל הילדים";
   const owner = REM_PERSONS[r.owner] || "אורן";
@@ -593,11 +595,26 @@ function remRow(r){
     ? '<details class="rem-bg"><summary>פרטים נוספים</summary><div class="rem-bg-text">' + esc(bgText).replace(/\n/g, "<br>") + "</div></details>" : "";
   const seenBtn = (!r.done && !r.seen)
     ? '<button class="rem-seen" data-id="' + esc(r.id) + '">👁 ראיתי</button>' : "";
+  const remComments = Array.isArray(r.comments) ? r.comments : [];
+  const remCountLabel = remComments.length ? "💬 " + remComments.length + " תגובות" : "💬 תגובות";
+  const threadHtml = '<details class="req-thread" data-rem="' + esc(r.id) + '"' + (remOpenThreads[r.id] ? " open" : "") + ">"
+    + "<summary>" + remCountLabel + "</summary>"
+    + '<div class="req-comments">' + (remComments.length ? remComments.map(c =>
+        '<div class="req-comment"><div class="req-comment-meta">' + (REM_PERSONS[c.by] || esc(c.by))
+        + (c.created ? " · " + formatUpdated(c.created) : "") + '</div>'
+        + '<div class="req-comment-text">' + esc(c.text) + "</div></div>").join("")
+      : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
+    + "</div>"
+    + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
+    + '<div class="rem-form-row"><select aria-label="מי מגיב/ה"><option value="oren">מגיב/ה: אורן</option><option value="lior">מגיב/ה: ליאור</option></select>'
+    + '<button class="req-comment-send" data-rem="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
+    + "</details>";
+
   return '<div class="rem-row' + (r.done ? " done" : "") + (r.seen && !r.done ? " seen" : "") + '">'
     + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
     + '<div class="rem-main"><div class="rem-text">' + esc(r.text)
     + (overdue ? '<span class="due-badge">⏰ באיחור</span>' : "") + "</div>"
-    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + bgHtml + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + bgHtml + threadHtml + "</div>"
     + '<div class="rem-actions">' + seenBtn
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="ערוך תזכורת" data-edit="1">✏️</button>'
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
@@ -649,7 +666,7 @@ function renderReminders(){
     html += '<div class="rem-empty">אין תזכורות פתוחות — הוסיפו אחת למעלה 🙂</div>';
   }
   if(doneList.length){
-    html += '<details class="rem-archive"><summary>🗄️ ארכיון (' + doneList.length + ")</summary>"
+    html += '<details class="rem-archive"' + (remArchiveOpen ? " open" : "") + '><summary>🗄️ ארכיון (' + doneList.length + ")</summary>"
       + doneList.map(remRow).join("") + "</details>";
   }
   document.getElementById("remApp").innerHTML = html;
@@ -710,6 +727,15 @@ function renderReminders(){
   });
   document.querySelectorAll("#remApp .rem-del[data-edit]").forEach(btn => {
     btn.addEventListener("click", () => startEditReminder(btn.dataset.id));
+  });
+  document.querySelectorAll("#remApp details.rem-archive").forEach(det => {
+    det.addEventListener("toggle", () => { remArchiveOpen = det.open; });
+  });
+  document.querySelectorAll("#remApp details.req-thread[data-rem]").forEach(det => {
+    det.addEventListener("toggle", () => { remOpenThreads[det.dataset.rem] = det.open; });
+  });
+  document.querySelectorAll("#remApp .req-comment-send[data-rem]").forEach(btn => {
+    btn.addEventListener("click", () => addReminderComment(btn.dataset.rem));
   });
 }
 /* ---- feature requests / bug reports (shared, stored in KV via /api/requests) ---- */
@@ -776,6 +802,32 @@ async function addRequestComment(id){
     }
     reqOpenThreads[id] = true;
     renderRequests();
+  }catch(e){ alert("התגובה לא נשלחה — נסו שוב."); }
+  btn.disabled = false;
+}
+
+
+async function addReminderComment(id){
+  const det = document.querySelector('details.req-thread[data-rem="' + id + '"]');
+  if(!det) return;
+  const ta = det.querySelector("textarea");
+  const sel = det.querySelector("select");
+  const text = (ta.value || "").trim();
+  if(!text){ ta.focus(); return; }
+  const btn = det.querySelector(".req-comment-send");
+  btn.disabled = true;
+  try{
+    const res = await fetchJSON("/api/reminders/" + encodeURIComponent(id) + "/comments", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ text, by: sel.value })
+    }, 3);
+    const r = REMINDERS.find(x => x.id === id);
+    if(r){
+      r.comments = Array.isArray(r.comments) ? r.comments : [];
+      r.comments.push(res.comment);
+    }
+    remOpenThreads[id] = true;
+    renderReminders();
   }catch(e){ alert("התגובה לא נשלחה — נסו שוב."); }
   btn.disabled = false;
 }

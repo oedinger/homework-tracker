@@ -3,7 +3,8 @@
 //   week:<week name> -> {week, updated, tasks: [...]}
 //   meta             -> {weeks: [...chronological...], current: "<week name>"}
 //   reminders          -> [{id, text, date, time, child, done, created,
-//                           createdBy, owner, seen, seenAt, notified, background}]
+//                           createdBy, owner, seen, seenAt, notified, background,
+//                           comments: [{id, by, text, created}]}]
 //     child: "all" | "daniel" | "naya" | "ben" | "alin";
 //     createdBy/owner: "oren" | "lior". Old entries without the new fields
 //     are treated as createdBy=owner="oren", seen=false, notified=false.
@@ -27,6 +28,7 @@
 // GET /api/reminders, POST /api/reminders, PATCH /api/reminders/:id,
 // POST /api/reminders/:id/done, POST /api/reminders/:id/seen,
 // POST /api/reminders/:id/notify (Bearer SYNC_SECRET),
+// POST /api/reminders/:id/comments,
 // DELETE /api/reminders/:id,
 // GET /api/requests, POST /api/requests,
 // POST /api/requests/:id/comments,
@@ -105,6 +107,9 @@ async function putReminders(env, list) {
 function reminderId() {
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+function remCommentId() {
+  return 'rc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 const REM_CHILDREN = ['all', 'daniel', 'naya', 'ben', 'alin'];
 const isPerson = (v) => v === 'oren' || v === 'lior';
 // Backward compatibility: old reminders lack createdBy/owner/seen/seenBy/
@@ -121,6 +126,14 @@ function normReminder(r) {
     remindedDay: !!r.remindedDay,
     remindedHour: !!r.remindedHour,
     background: typeof r.background === 'string' ? r.background.slice(0, 1000) : '',
+    comments: Array.isArray(r.comments)
+      ? r.comments.filter((c) => c && typeof c.text === 'string').map((c) => ({
+          id: c.id || remCommentId(),
+          by: isPerson(c.by) ? c.by : 'oren',
+          text: String(c.text).slice(0, 500),
+          created: c.created || '',
+        }))
+      : [],
   };
 }
 
@@ -213,6 +226,7 @@ export default {
         created: new Date().toISOString(),
         createdBy, owner, background, seen: false, seenAt: null, seenBy: null,
         notified: false, remindedDay: false, remindedHour: false,
+        comments: [],
       };
       const list = await getReminders(env);
       list.push(reminder);
@@ -329,6 +343,26 @@ export default {
       Object.assign(r, nr);
       await putReminders(env, list);
       return json(normReminder(r));
+    }
+    const remCommentMatch = path.match(/^\/api\/reminders\/([^/]+)\/comments$/);
+    if (remCommentMatch && request.method === 'POST') {
+      const id = decodeURIComponent(remCommentMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
+      const text = String(body.text || '').trim();
+      if (!by || !text || text.length > 500) {
+        return json({ error: 'by (oren|lior) and text (1-500 chars) are required' }, 400);
+      }
+      const list = await getReminders(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      const nr = normReminder(r);
+      const comment = { id: remCommentId(), by, text, created: new Date().toISOString() };
+      nr.comments.push(comment);
+      Object.assign(r, nr);
+      await putReminders(env, list);
+      return json({ comment, reminder: normReminder(r) }, 201);
     }
     const remDelMatch = path.match(/^\/api\/reminders\/([^/]+)$/);
     if (remDelMatch && request.method === 'DELETE') {
