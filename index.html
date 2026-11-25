@@ -255,6 +255,17 @@
   .req-badge.st-in_progress{background:#dbeafe; color:#1e40af}
   .req-badge.st-done{background:var(--green-soft); color:var(--green)}
   .req-badge.st-needs_info{background:#fee2e2; color:#991b1b}
+  .req-thread{margin-top:8px}
+  .req-thread summary{cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); padding:4px 2px}
+  .req-comment{font-size:14px; line-height:1.5; padding:6px 0; border-top:1px solid var(--line)}
+  .req-comment:first-of-type{border-top:none}
+  .req-comment-meta{font-size:12px; color:var(--muted); font-weight:700; margin-bottom:2px}
+  .req-comment-text{white-space:pre-wrap}
+  .req-comment-form{margin-top:8px}
+  .req-comment-form textarea{width:100%; box-sizing:border-box; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:8px 10px; font-size:14px; font-family:inherit; resize:vertical}
+  .req-comment-form .rem-form-row{margin-top:6px}
+  .req-comment-send{flex:none; border:none; background:var(--accent); color:#fff; border-radius:999px; padding:9px 14px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap}
+  .req-comment-send:disabled{opacity:.6}
 </style>
 </head>
 <body>
@@ -707,6 +718,7 @@ const REQ_STATUS = {open:"פתוח", in_progress:"בטיפול", done:"בוצע"
 const REQ_TYPE = {feature:"✨ פיצ'ר חדש", bug:"🐛 תיקון באג"};
 const REQ_BY = {oren:"אורן", lior:"ליאור"};
 
+let reqOpenThreads = {};
 function renderRequests(){
   const app = document.getElementById("reqApp");
   if(!REQUESTS.length){
@@ -715,11 +727,57 @@ function renderRequests(){
   }
   app.innerHTML = REQUESTS.map(r => {
     const d = r.created ? shortDate(String(r.created).slice(0, 10)) : "";
+    const comments = Array.isArray(r.comments) ? r.comments : [];
+    const countLabel = comments.length ? "💬 " + comments.length + " תגובות" : "💬 תגובות";
+    const thread = '<details class="req-thread" data-req="' + esc(r.id) + '"' + (reqOpenThreads[r.id] ? " open" : "") + ">"
+      + "<summary>" + countLabel + "</summary>"
+      + '<div class="req-comments">' + (comments.length ? comments.map(c =>
+          '<div class="req-comment"><div class="req-comment-meta">' + (REQ_BY[c.by] || esc(c.by))
+          + (c.created ? " · " + formatUpdated(c.created) : "") + '</div>'
+          + '<div class="req-comment-text">' + esc(c.text) + "</div></div>").join("")
+        : '<div class="rem-empty" style="margin:6px 0">אין תגובות עדיין — כתבו את הראשונה 🙂</div>')
+      + "</div>"
+      + '<div class="req-comment-form"><textarea rows="2" maxlength="500" placeholder="כתבו תגובה…" aria-label="תגובה"></textarea>'
+      + '<div class="rem-form-row"><select aria-label="מי מגיב/ה"><option value="oren">מגיב/ה: אורן</option><option value="lior">מגיב/ה: ליאור</option></select>'
+      + '<button class="req-comment-send" data-req="' + esc(r.id) + '">💬 הוסף תגובה</button></div></div>'
+      + "</details>";
     return '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(r.text) + "</div>"
       + '<div class="rem-meta"><span class="req-badge">' + (REQ_TYPE[r.type] || esc(r.type)) + "</span>"
       + '<span class="req-badge st-' + esc(r.status) + '">' + (REQ_STATUS[r.status] || esc(r.status)) + "</span>"
-      + " · " + (REQ_BY[r.by] || esc(r.by)) + (d ? " · " + d : "") + "</div></div></div>";
+      + " · " + (REQ_BY[r.by] || esc(r.by)) + (d ? " · " + d : "") + "</div>"
+      + thread + "</div></div>";
   }).join("");
+  app.querySelectorAll("details.req-thread").forEach(det => {
+    det.addEventListener("toggle", () => { reqOpenThreads[det.dataset.req] = det.open; });
+  });
+  app.querySelectorAll(".req-comment-send").forEach(btn => {
+    btn.addEventListener("click", () => addRequestComment(btn.dataset.req));
+  });
+}
+
+async function addRequestComment(id){
+  const det = document.querySelector('details.req-thread[data-req="' + id + '"]');
+  if(!det) return;
+  const ta = det.querySelector("textarea");
+  const sel = det.querySelector("select");
+  const text = (ta.value || "").trim();
+  if(!text){ ta.focus(); return; }
+  const btn = det.querySelector(".req-comment-send");
+  btn.disabled = true;
+  try{
+    const res = await fetchJSON("/api/requests/" + encodeURIComponent(id) + "/comments", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ text, by: sel.value })
+    }, 3);
+    const r = REQUESTS.find(x => x.id === id);
+    if(r){
+      r.comments = Array.isArray(r.comments) ? r.comments : [];
+      r.comments.push(res.comment);
+    }
+    reqOpenThreads[id] = true;
+    renderRequests();
+  }catch(e){ alert("התגובה לא נשלחה — נסו שוב."); }
+  btn.disabled = false;
 }
 
 async function loadRequests(){

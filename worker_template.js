@@ -7,7 +7,8 @@
 //     child: "all" | "daniel" | "naya" | "ben" | "alin";
 //     createdBy/owner: "oren" | "lior". Old entries without the new fields
 //     are treated as createdBy=owner="oren", seen=false, notified=false.
-//   feature-requests   -> [{id, type, text, by, status, created, updated}]
+//   feature-requests   -> [{id, type, text, by, status, created, updated,
+//                              comments: [{id, by, text, created}]}]
 //     type: "feature" | "bug"; by: "oren" | "lior" (only these two may ask);
 //     status: "open" | "in_progress" | "done" | "needs_info".
 // Legacy key "state" (single-week doc from the first deployment) is merged
@@ -28,6 +29,7 @@
 // POST /api/reminders/:id/notify (Bearer SYNC_SECRET),
 // DELETE /api/reminders/:id,
 // GET /api/requests, POST /api/requests,
+// POST /api/requests/:id/comments,
 // POST /api/requests/:id/status (Bearer SYNC_SECRET),
 // DELETE /api/requests/:id (Bearer SYNC_SECRET),
 // POST /api/sync (Bearer SYNC_SECRET — upserts one week, keeps meta current).
@@ -131,6 +133,23 @@ async function putRequests(env, list) {
 }
 function requestId() {
   return 'fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function commentId() {
+  return 'fc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+// Backward compatibility: old requests lack comments.
+function normRequest(r) {
+  return {
+    ...r,
+    comments: Array.isArray(r.comments)
+      ? r.comments.filter((c) => c && typeof c.text === 'string').map((c) => ({
+          id: c.id || commentId(),
+          by: isPerson(c.by) ? c.by : 'oren',
+          text: String(c.text).slice(0, 500),
+          created: c.created || '',
+        }))
+      : [],
+  };
 }
 
 export default {
@@ -326,7 +345,7 @@ export default {
     // no login; the site is not publicized). Status changes and deletes
     // require the sync bearer secret, same as /api/sync.
     if (path === '/api/requests' && request.method === 'GET') {
-      return json({ requests: await getRequests(env) });
+      return json({ requests: (await getRequests(env)).map(normRequest) });
     }
     if (path === '/api/requests' && request.method === 'POST') {
       let body = {};
@@ -340,12 +359,33 @@ export default {
       const now = new Date().toISOString();
       const req = {
         id: requestId(), type, text, by,
-        status: 'open', created: now, updated: now,
+        status: 'open', created: now, updated: now, comments: [],
       };
       const list = await getRequests(env);
       list.unshift(req);
       await putRequests(env, list);
       return json({ request: req }, 201);
+    }
+    const reqCommentMatch = path.match(/^\/api\/requests\/([^/]+)\/comments$/);
+    if (reqCommentMatch && request.method === 'POST') {
+      const id = decodeURIComponent(reqCommentMatch[1]);
+      let body = {};
+      try { body = await request.json(); } catch { /* ignore */ }
+      const by = body.by === 'oren' || body.by === 'lior' ? body.by : '';
+      const text = String(body.text || '').trim();
+      if (!by || !text || text.length > 500) {
+        return json({ error: 'by (oren|lior) and text (1-500 chars) are required' }, 400);
+      }
+      const list = await getRequests(env);
+      const r = list.find((x) => x.id === id);
+      if (!r) return json({ error: 'not found' }, 404);
+      const nr = normRequest(r);
+      const comment = { id: commentId(), by, text, created: new Date().toISOString() };
+      nr.comments.push(comment);
+      nr.updated = new Date().toISOString();
+      Object.assign(r, nr);
+      await putRequests(env, list);
+      return json({ comment, request: normRequest(r) }, 201);
     }
     const reqStatusMatch = path.match(/^\/api\/requests\/([^/]+)\/status$/);
     if (reqStatusMatch && request.method === 'POST') {
@@ -364,7 +404,7 @@ export default {
       r.status = status;
       r.updated = new Date().toISOString();
       await putRequests(env, list);
-      return json(r);
+      return json(normRequest(r));
     }
     const reqDelMatch = path.match(/^\/api\/requests\/([^/]+)$/);
     if (reqDelMatch && request.method === 'DELETE') {
