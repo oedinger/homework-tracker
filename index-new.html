@@ -212,7 +212,8 @@
   }
   .rem-add:disabled{opacity:.6}
   .rem-sec{font-size:16px; font-weight:800; margin:18px 4px 6px}
-  .rem-row{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px; margin:0 4px 6px}
+  .rem-row{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px; margin:0 4px 6px}
+  .rem-thread-full{flex:1 1 100%; min-width:0}
   .rem-row.done{opacity:.6}
   .rem-row.done .rem-text{text-decoration:line-through}
   .rem-check{flex:none; width:26px; height:26px; margin-top:1px; cursor:pointer; accent-color:var(--green); transform:scale(1.2)}
@@ -1021,10 +1022,10 @@ function remRow(r){
     + '<input type="checkbox" class="rem-check" aria-label="סימון ביצוע: ' + esc(r.text) + '" data-id="' + esc(r.id) + '"' + (r.done ? " checked" : "") + '>'
     + '<div class="rem-main"><div class="rem-text">' + esc(r.text)
     + (overdue ? '<span class="due-badge">⏰ באיחור</span>' : "") + "</div>"
-    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + bgHtml + threadHtml + "</div>"
+    + (meta ? '<div class="rem-meta">' + meta + "</div>" : "") + seenLine + bgHtml + "</div>"
     + '<div class="rem-actions">' + seenBtn
     + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="ערוך תזכורת" data-edit="1">✏️</button>'
-    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div></div>';
+    + '<button class="rem-del" data-id="' + esc(r.id) + '" aria-label="מחק תזכורת">✕</button></div>' + '<div class="rem-thread-full">' + threadHtml + "</div></div>";
 }
 
 /* ---- reminders filters (client-side only, reset on reload) ---- */
