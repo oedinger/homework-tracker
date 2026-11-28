@@ -10,6 +10,17 @@
 //     are treated as createdBy=owner="oren", seen=false, notified=false.
 //   feature-requests   -> [{id, type, text, by, status, created, updated,
 //                              comments: [{id, by, text, created}]}]
+//   events             -> [{id, child, title, date, time, place, source,
+//                           cal_id, cal, created, updated}]
+//     Kids' birthdays, parties and school/gan events, extracted by the
+//     homework pipeline from the kids' WhatsApp groups (same runs, same
+//     fetched messages). Pushed via /api/sync (Bearer SYNC_SECRET); read
+//     publicly by the site's "אירועים קרובים" tab. child is one of
+//     daniel|naya|ben|alin|all; date is YYYY-MM-DD; time is "HH:MM" or ""
+//     (unknown -> the calendar event is all-day); cal is "primary" or
+//     "chugim" (which Google Calendar holds it); cal_id is the Google
+//     Calendar event id, so the tab row links to the calendar event and
+//     the pipeline can dedupe against both calendars.
 //   users              -> {oren: {salt, hash}, lior: {salt, hash}}
 //                           hash = SHA-256(salt + ":" + password); no plaintext
 //                           passwords anywhere.
@@ -53,7 +64,9 @@
 // POST /api/requests/:id/comments,
 // POST /api/requests/:id/status (Bearer SYNC_SECRET),
 // DELETE /api/requests/:id (Bearer SYNC_SECRET),
-// POST /api/sync (Bearer SYNC_SECRET — upserts one week, keeps meta current).
+// GET /api/events (public — upcoming kids' events for the "אירועים קרובים" tab),
+// POST /api/sync (Bearer SYNC_SECRET — upserts one week, keeps meta current;
+//   accepts an optional "events" array, which replaces the stored events).
 // POST /api/sync-request (session required — queue a manual full-pipeline run),
 // GET /api/sync-status (public — current request + last run),
 // POST /api/sync-request/claim (Bearer SYNC_SECRET — pending -> running),
@@ -236,6 +249,30 @@ function normRequest(r) {
           created: c.created || '',
         }))
       : [],
+  };
+}
+
+// ---- kids' events (KV key "events") ----
+const EV_CHILDREN = ['daniel', 'naya', 'ben', 'alin', 'all'];
+async function getEvents(env) {
+  return (await env.HOMEWORK_KV.get('events', 'json')) || [];
+}
+async function putEvents(env, list) {
+  await env.HOMEWORK_KV.put('events', JSON.stringify(list.slice(0, 200)));
+}
+function normEvent(e) {
+  return {
+    id: String(e.id || ''),
+    child: EV_CHILDREN.includes(e.child) ? e.child : 'all',
+    title: String(e.title || '').slice(0, 200),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(e.date || '')) ? e.date : '',
+    time: /^\d{2}:\d{2}$/.test(String(e.time || '')) ? e.time : '',
+    place: String(e.place || '').slice(0, 200),
+    source: String(e.source || '').slice(0, 100),
+    cal_id: String(e.cal_id || '').slice(0, 100),
+    cal: e.cal === 'chugim' ? 'chugim' : 'primary',
+    created: String(e.created || ''),
+    updated: String(e.updated || ''),
   };
 }
 
@@ -609,6 +646,18 @@ export default {
     if (path === '/api/requests' && request.method === 'GET') {
       return json({ requests: (await getRequests(env)).map(normRequest) });
     }
+
+    // ---- kids' events (KV key "events") ----
+    // Public read for the "אירועים קרובים" tab. Past events drop off
+    // automatically (the UTC date is the cutoff — an event from yesterday
+    // IST can linger a few hours into the morning; the pipeline prunes
+    // on its side too, so the stored list stays clean).
+    if (path === '/api/events' && request.method === 'GET') {
+      const today = new Date().toISOString().slice(0, 10);
+      const events = (await getEvents(env)).map(normEvent)
+        .filter((e) => e.id && e.date && e.date >= today);
+      return json({ events });
+    }
     if (path === '/api/requests' && request.method === 'POST') {
       const sess = await requireSession(env, request);
       if (!sess) return json({ error: 'login_required' }, 401);
@@ -739,7 +788,22 @@ export default {
       if (legacy && legacy.week === week) {
         await env.HOMEWORK_KV.delete('state');
       }
-      return json({ ok: true, count: tasks.length, week, carried, new: isNew });
+      // Kids' events ride along with the sync payload when the pipeline
+      // sends them (the "events" key is optional — older sync clients
+      // send none and the stored list is left untouched). The payload is
+      // the pipeline's full current set, so it replaces the stored list.
+      let eventsCount = null;
+      if (Array.isArray(data.events)) {
+        const byId = new Map();
+        for (const e of data.events.map(normEvent)) {
+          if (e.id && e.date && e.title) byId.set(e.id, e);
+        }
+        const events = [...byId.values()].sort((a, b) =>
+          (a.date + (a.time || '99')) < (b.date + (b.time || '99')) ? -1 : 1);
+        await putEvents(env, events);
+        eventsCount = events.length;
+      }
+      return json({ ok: true, count: tasks.length, week, carried, new: isNew, events: eventsCount });
     }
 
     return new Response('Not found', { status: 404 });

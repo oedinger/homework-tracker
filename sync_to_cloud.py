@@ -20,6 +20,7 @@ OUT = "/home/hatch/workspace/homework-build/tasks.json"
 SECRET_FILE = "/home/hatch/workspace/homework-build/.sync-secret"
 SYNC_URL = "https://homework.oedinger.stream/api/sync"
 PULLS_FILE = "/home/hatch/workspace/goals/goal-13/hidden_files/source-pulls.json"
+EVENTS_FILE = "/home/hatch/workspace/goals/goal-13/hidden_files/events.json"
 
 
 def read_pulls():
@@ -31,6 +32,22 @@ def read_pulls():
             return json.load(f)
     except Exception:
         return {}
+
+
+def read_events():
+    """Kids' events for the site's "אירועים קרובים" tab, maintained by the
+    homework pipeline (one entry per event: id, child, title, date, time,
+    place, source, cal_id, cal). Returns None when the file is missing or
+    unreadable — the caller then sends no "events" key and the Worker
+    keeps the stored list untouched."""
+    try:
+        with open(EVENTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, list):
+        return None
+    return [e for e in data if isinstance(e, dict) and e.get("id") and e.get("date")]
 
 
 def gws(args):
@@ -227,11 +244,32 @@ def post_sync(payload, verify_week=None):
             if result.get("ok") is None:
                 result = {"ok": True, "count": len(payload["tasks"]),
                           "week": want_week, "verified_by_poll": True}
-            return result
+            break
         time.sleep(3)
-    raise RuntimeError(
-        f"sync POST result={result} but live state for {want_week} "
-        f"does not match ({len(payload['tasks'])} tasks expected)")
+    else:
+        raise RuntimeError(
+            f"sync POST result={result} but live state for {want_week} "
+            f"does not match ({len(payload['tasks'])} tasks expected)")
+    # When the payload carried kids' events, verify them the same way:
+    # the live /api/events list must hold exactly the payload's event ids.
+    if "events" in payload:
+        want_ids = {e["id"] for e in payload["events"]}
+        ev_url = SYNC_URL.replace("/api/sync", "/api/events")
+        for _ in range(6):
+            try:
+                ev_state = curl_get_json(ev_url)
+                got_ids = {e.get("id") for e in ev_state.get("events", [])}
+            except Exception:
+                got_ids = set()
+            if got_ids == want_ids:
+                break
+            time.sleep(3)
+        else:
+            raise RuntimeError(
+                f"sync POST result={result} but live /api/events "
+                f"does not match ({len(want_ids)} events expected, "
+                f"got {len(got_ids)})")
+    return result
 
 
 def main():
@@ -241,13 +279,17 @@ def main():
         return
     week = newest_week_tab()
     payload = build_tasks(week)
+    events = read_events()
+    if events is not None:
+        payload["events"] = events
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1)
     result = post_sync(payload)
     n_d = sum(1 for t in payload["tasks"] if t["child"] == "daniel")
     n_n = sum(1 for t in payload["tasks"] if t["child"] == "naya")
+    ev = f" events={len(events)}" if events is not None else ""
     print(f"synced week {week}: daniel={n_d} naya={n_n} "
-          f"total={len(payload['tasks'])} server={result}")
+          f"total={len(payload['tasks'])}{ev} server={result}")
 
 
 def backfill():

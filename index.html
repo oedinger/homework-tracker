@@ -252,6 +252,8 @@
   .creator-note{font-size:13px;color:var(--muted);font-weight:700;align-self:center}
   .comment-as{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
+  .ev-day{font-weight:800; font-size:15px; margin:16px 4px 6px}
+  .ev-day .ev-date{color:var(--muted); font-weight:400; font-size:13px}
   .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
   .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
   .due-badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; background:#fee2e2; color:#991b1b; margin-inline-start:6px}
@@ -307,6 +309,7 @@
     <button class="tab" data-tab="schedule">🗓️ מערכת שעות</button>
     <button class="tab" data-tab="reminders">⏰ תזכורות</button>
     <button class="tab" data-tab="requests">💡 בקשות</button>
+    <button class="tab" data-tab="events">🎉 אירועים קרובים</button>
   </nav>
 
   <div class="err" id="err">לא הצלחתי לטעון את המשימות — נסו לרענן את הדף.</div>
@@ -399,6 +402,12 @@
     </div>
     <div id="reqApp"></div>
     <div class="sched-note">הבקשות נשמרות באתר — רק אורן וליאור יכולים לבקש פיצ'רים או לדווח על באגים, והן מטופלות אוטומטית. כשבקשה תטופל, הסטטוס שלה יתעדכן כאן.</div>
+  </div>
+
+  <div id="eventsView" style="display:none">
+    <h2 class="page-heading">אירועים קרובים</h2>
+    <div id="eventsApp"></div>
+    <div class="sched-note">ימי הולדת, מסיבות ואירועי בית ספר וגן — נאספים אוטומטית מהודעות הוואטסאפ של קבוצות הילדים ונכנסים גם ליומן המשותף. אירועים שעברו נמחקים אוטומטית.</div>
   </div>
 
   <footer>
@@ -726,13 +735,16 @@ function switchTab(tab){
   document.getElementById("scheduleView").style.display = tab === "schedule" ? "block" : "none";
   document.getElementById("remindersView").style.display = tab === "reminders" ? "block" : "none";
   document.getElementById("requestsView").style.display = tab === "requests" ? "block" : "none";
+  document.getElementById("eventsView").style.display = tab === "events" ? "block" : "none";
   if(tab === "schedule") renderSchedule();
   if(tab === "reminders") renderReminders();
   if(tab === "requests") renderRequests();
+  if(tab === "events") renderEvents();
   try{
     const h = tab === "homework" ? "#homework"
       : tab === "reminders" ? "#reminders"
       : tab === "requests" ? "#requests"
+      : tab === "events" ? "#events"
       : "#schedule" + (schedDay !== new Date().getDay() ? "-" + schedDay : "");
     history.replaceState(null, "", h);
   }catch(e){}
@@ -1032,6 +1044,49 @@ async function loadRequests(){
   }catch(e){ /* requests stay as-is; the tab shows the empty state */ }
 }
 
+/* ---- events tab: upcoming kids' events (from /api/events) ----
+   Pushed by the homework pipeline (birthdays, parties, school/gan
+   events found in the kids' WhatsApp groups). Shown grouped by day,
+   today onward — all upcoming events, not just this week, so a party
+   announced a few weeks ahead (e.g. Rani's, 18/12) is visible. */
+let EVENTS = [];
+const EV_KIDS = {
+  daniel: "🔵 דניאל", naya: "🩷 נאיה", ben: "🟢 בן", alin: "🟣 אלין", all: "כל הילדים"
+};
+async function loadEvents(){
+  try{
+    const data = await fetchJSON("/api/events", null, 3);
+    EVENTS = data.events || [];
+    if(activeTab === "events") renderEvents();
+  }catch(e){ /* events stay as-is; the tab shows the empty state */ }
+}
+function renderEvents(){
+  const app = document.getElementById("eventsApp");
+  if(!app) return;
+  const today = todayISO();
+  const list = EVENTS.filter(e => e.date && e.date >= today)
+    .sort((a, b) => (a.date + (a.time || "99")) < (b.date + (b.time || "99")) ? -1 : 1);
+  if(!list.length){
+    app.innerHTML = '<div class="rem-empty">אין אירועים קרובים — ימי הולדת ומסיבות שיפורסמו בקבוצות הילדים יופיעו כאן 🙂</div>';
+    return;
+  }
+  const byDay = {};
+  list.forEach(e => { (byDay[e.date] = byDay[e.date] || []).push(e); });
+  let html = "";
+  Object.keys(byDay).sort().forEach(d => {
+    const label = dayName(d) + " " + shortDate(d) + (d === today ? " · היום" : "");
+    html += '<div class="ev-day">' + esc(label) + "</div>";
+    byDay[d].forEach(e => {
+      const time = e.time ? "🕐 " + esc(e.time) : "🕐 שעה לא צוינה";
+      const place = e.place ? "📍 " + esc(e.place) : "";
+      const src = e.source ? " · מקור: " + esc(e.source) : "";
+      html += '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(e.title) + "</div>"
+        + '<div class="rem-meta">' + time + (place ? " · " + place : "") + " · " + (EV_KIDS[e.child] || "כל הילדים") + src + "</div></div></div>";
+    });
+  });
+  app.innerHTML = html;
+}
+
 async function addRequest(){
   if(!AUTH_USER){ openAuth("login"); return; }
   const textEl = document.getElementById("reqText");
@@ -1184,6 +1239,7 @@ async function reloadData(){
   else { DATA = await fetchJSON("/api/tasks"); render(); }
   await loadReminders();
   await loadRequests();
+  await loadEvents();
   lastLoadAt = Date.now();
 }
 
@@ -1465,6 +1521,7 @@ async function load(){
     lastLoadAt = Date.now();
     await loadReminders();
     await loadRequests();
+    await loadEvents();
     await loadSyncStatus();
   }catch(e){
     document.getElementById("err").style.display = "block";
@@ -1542,6 +1599,7 @@ document.getElementById("shareSched").addEventListener("click", async () => {
   if(h === "schedule"){ switchTab("schedule"); return; }
   if(h === "reminders"){ switchTab("reminders"); return; }
   if(h === "requests"){ switchTab("requests"); return; }
+  if(h === "events"){ switchTab("events"); return; }
   const m = h.match(/^schedule-([0-5])$/);
   if(m){ schedDay = +m[1]; switchTab("schedule"); }
 })();
