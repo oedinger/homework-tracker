@@ -254,6 +254,11 @@
   .comment-as{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
   .rem-empty{text-align:center; color:var(--muted); padding:20px 10px; font-size:14px; background:var(--card); border:1px dashed var(--line); border-radius:var(--radius); margin:0 4px}
   .ev-day{font-weight:800; font-size:15px; margin:16px 4px 6px}
+  .ev-section{font-weight:800; font-size:17px; margin:18px 4px 8px; padding-bottom:4px; border-bottom:1px solid var(--line)}
+  .ev-section:first-child{margin-top:6px}
+  .ev-line{font-size:14px; margin-top:3px}
+  .ev-src{font-size:12px; color:var(--muted); margin-top:4px}
+  .ev-none{color:var(--muted); font-size:13px; margin:2px 4px 12px}
   .ev-day .ev-date{color:var(--muted); font-weight:400; font-size:13px}
   .rem-row.seen{background:var(--yellow-soft); border-color:#fde68a}
   .rem-seen-line{font-size:13px; color:#92400e; font-weight:700; margin-top:3px}
@@ -1048,9 +1053,10 @@ async function loadRequests(){
 
 /* ---- events tab: upcoming kids' events (from /api/events) ----
    Pushed by the homework pipeline (birthdays, parties, school/gan
-   events found in the kids' WhatsApp groups). Shown grouped by day,
-   today onward — all upcoming events, not just this week, so a party
-   announced a few weeks ahead (e.g. Rani's, 18/12) is visible. */
+   events found in the kids' WhatsApp groups). Shown grouped by day in
+   two sections: "בשבוע הקרוב" (rolling — today through 7 days ahead)
+   first, then "לאחר מכן" for everything later. Each card is stacked
+   rows: title, child + time, place, source. */
 let EVENTS = [];
 const EV_KIDS = {
   daniel: "🔵 דניאל", naya: "🩷 נאיה", ben: "🟢 בן", alin: "🟣 אלין", all: "כל הילדים"
@@ -1062,6 +1068,29 @@ async function loadEvents(){
     if(activeTab === "events") renderEvents();
   }catch(e){ /* events stay as-is; the tab shows the empty state */ }
 }
+function evGroupHTML(group, today){
+  if(!group.length) return '<div class="ev-none">אין אירועים</div>';
+  const byDay = {};
+  group.forEach(e => { (byDay[e.date] = byDay[e.date] || []).push(e); });
+  let html = "";
+  Object.keys(byDay).sort().forEach(d => {
+    const label = dayName(d) + " " + shortDate(d) + (d === today ? " · היום" : "");
+    html += '<div class="ev-day">' + esc(label) + "</div>";
+    byDay[d].forEach(e => {
+      const time = e.time ? "🕐 " + esc(e.time) : "🕐 שעה לא צוינה";
+      const kid = EV_KIDS[e.child] || "כל הילדים";
+      const place = e.place ? "📍 " + esc(e.place) : "";
+      const src = e.source ? "מקור: " + esc(e.source) : "";
+      html += '<div class="rem-row"><div class="rem-main">'
+        + '<div class="rem-text">' + esc(e.title) + "</div>"
+        + '<div class="ev-line">' + kid + " · " + time + "</div>"
+        + (place ? '<div class="ev-line">' + place + "</div>" : "")
+        + (src ? '<div class="ev-src">' + src + "</div>" : "")
+        + "</div></div>";
+    });
+  });
+  return html;
+}
 function renderEvents(){
   const app = document.getElementById("eventsApp");
   if(!app) return;
@@ -1072,21 +1101,12 @@ function renderEvents(){
     app.innerHTML = '<div class="rem-empty">אין אירועים קרובים — ימי הולדת ומסיבות שיפורסמו בקבוצות הילדים יופיעו כאן 🙂</div>';
     return;
   }
-  const byDay = {};
-  list.forEach(e => { (byDay[e.date] = byDay[e.date] || []).push(e); });
-  let html = "";
-  Object.keys(byDay).sort().forEach(d => {
-    const label = dayName(d) + " " + shortDate(d) + (d === today ? " · היום" : "");
-    html += '<div class="ev-day">' + esc(label) + "</div>";
-    byDay[d].forEach(e => {
-      const time = e.time ? "🕐 " + esc(e.time) : "🕐 שעה לא צוינה";
-      const place = e.place ? "📍 " + esc(e.place) : "";
-      const src = e.source ? " · מקור: " + esc(e.source) : "";
-      html += '<div class="rem-row"><div class="rem-main"><div class="rem-text">' + esc(e.title) + "</div>"
-        + '<div class="rem-meta">' + time + (place ? " · " + place : "") + " · " + (EV_KIDS[e.child] || "כל הילדים") + src + "</div></div></div>";
-    });
-  });
-  app.innerHTML = html;
+  const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndISO = isoOf(weekEnd);
+  const week = list.filter(e => e.date <= weekEndISO);
+  const later = list.filter(e => e.date > weekEndISO);
+  app.innerHTML = '<div class="ev-section">בשבוע הקרוב</div>' + evGroupHTML(week, today)
+    + '<div class="ev-section">לאחר מכן</div>' + evGroupHTML(later, today);
 }
 
 async function addRequest(){
